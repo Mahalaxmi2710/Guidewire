@@ -170,31 +170,48 @@ Payouts are automatically triggered when predefined thresholds are met:
 - Estimates hourly earning potential
 - Computes precise loss during disruptions
 
-### 3. Fraud Detection
+---
 
-Given the limitations of GPS-based validation and the emergence of coordinated spoofing attacks, the system employs a **multi-layered fraud detection strategy**:
+## Adversarial Defense & Anti-Spoofing Strategy
 
-#### Multi-Signal Verification
-- Network-based location triangulation  
-- Device motion analysis (accelerometer and gyroscope)  
-- Order activity correlation  
-- Environmental consistency checks  
+Given the rise of coordinated GPS spoofing attacks, basic location validation is insufficient :contentReference[oaicite:1]{index=1}.
 
-#### Behavioral Modeling
-- Learns individual work and movement patterns  
-- Detects anomalies in behavior  
+### 1. Differentiation (Real vs Spoofed Behavior)
 
-#### Fraud Ring Detection
-- Graph-based analysis to identify coordinated claim patterns  
-- Detection of cluster-based anomalies  
+The system distinguishes genuine workers from attackers using:
 
-#### UX-Aware Enforcement
-- Suspicious claims are:
-  - Partially processed  
-  - Flagged for passive verification  
-  - Fully settled after validation  
+- Continuous motion patterns vs static device behavior  
+- Consistent order activity vs inactivity during claimed disruption  
+- Realistic route movement vs improbable location jumps  
 
-This ensures fraud prevention without penalizing genuine users.
+---
+
+### 2. Data Signals Beyond GPS
+
+The system uses multi-source verification:
+
+- Network triangulation (cell tower signals)  
+- Device sensor data (accelerometer, gyroscope)  
+- Order assignment and activity logs  
+- Environmental consistency (matching disruption with nearby users and traffic patterns)  
+
+Additionally, graph-based analysis identifies:
+
+- Coordinated claims  
+- Clustered anomalies across users  
+- Fraud ring patterns  
+
+---
+
+### 3. UX Balance for Flagged Claims
+
+To avoid penalizing genuine users:
+
+- Suspicious claims receive **partial payout initially**  
+- Passive verification is triggered (no heavy friction)  
+- Full payout is released after validation  
+
+This ensures **strong fraud resistance while maintaining user trust and experience**.
 
 ---
 
@@ -207,8 +224,6 @@ The system uses a **serverless, event-driven architecture**:
 - **Firebase Auth**: Handles authentication and onboarding  
 - **Event-driven triggers**: Enable real-time claim processing  
 
-This architecture ensures **scalability, low latency, and real-time responsiveness**.
-
 ---
 
 ## Blockchain Integration
@@ -219,7 +234,7 @@ A lightweight blockchain layer can be integrated for:
 - Tamper-proof payout verification  
 - Immutable claim records  
 
-Blockchain is used strictly as a **trust and audit layer**, while core logic remains off-chain for performance.
+Blockchain is used strictly as a **trust and audit layer**, while core logic remains off-chain.
 
 ---
 
@@ -228,7 +243,7 @@ Blockchain is used strictly as a **trust and audit layer**, while core logic rem
 - **Workers**: Income stability and improved earning opportunities  
 - **Platforms**: Improved delivery continuity and reduced worker churn  
 - **Insurers**: Controlled payouts and reduced fraud exposure  
-- **Customers**: Continued service availability
+- **Customers**: Continued service availability  
 
 ---
 
@@ -261,7 +276,7 @@ A web-based platform is selected for:
 ## Tech Stack
 
 - Frontend: React.js, Tailwind CSS  
-- Backend: Firebase
+- Backend: Firebase  
 - AI/ML: Python (pandas, scikit-learn)  
 - APIs: Weather APIs, mock traffic and platform APIs  
 - Payments: Razorpay (test mode)  
