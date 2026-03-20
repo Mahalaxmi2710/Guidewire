@@ -349,4 +349,24 @@ A web-based platform is selected for:
 - AI/ML: Python (pandas, scikit-learn)  
 - APIs: Weather APIs, mock traffic and platform APIs  
 - Payments: Razorpay (test mode)  
-- Blockchain: Ethereum (Sepolia testnet)  
+- Blockchain: Ethereum (Sepolia testnet)
+
+---
+
+## 🎥 Demo Video
+
+This video demonstrates the complete workflow of the platform, including:
+
+- Registration and onboarding  
+- AI-driven premium calculation  
+- Real-time disruption monitoring  
+- Automated claim triggering and payout simulation  
+- Fraud detection handling  
+
+▶️ **YouTube:**  
+🔗 [Watch Demo Video](https://youtu.be/jmP7v9wbZyI?si=q4CgNFiuWonS65Me)
+
+📁 **Google Drive:**  
+🔗 [Access Video on Drive](https://drive.google.com/file/d/17f5XCks1wN_KdyB2XuG9vBGZl0podxBY/view?usp=sharing)
+
+---
