@@ -10,13 +10,31 @@ The system transforms traditional insurance from a **reactive compensation mecha
 
 ---
 
-## Target Persona
+## 👤 Target Persona
 
-**Urban food delivery partners (Swiggy/Zomato)**
+**Urban food delivery partners (Swiggy/Zomato) operating in tier-1 cities**
 
 ### Scenario
 
-A delivery partner in Chennai earns approximately ₹500–₹800 per day. During heavy rainfall or high congestion periods, their delivery capacity drops significantly, resulting in reduced earnings. Currently, no mechanism exists to compensate for this loss of income.
+A delivery partner in Chennai typically earns ₹500–₹800 per day by working 8–12 hours, with peak earnings during lunch (12–3 PM) and dinner (7–10 PM) slots. Their income is highly dependent on:
+
+- Order density in their zone  
+- Travel time between deliveries  
+- Accessibility of pickup/drop locations  
+
+During disruptions such as heavy rainfall, severe congestion, or platform downtime, their effective working hours reduce significantly, leading to direct income loss.
+
+### Persona Insights
+
+- Operates on a **weekly earning cycle with minimal financial buffer**  
+- Income is **time-sensitive and location-dependent**  
+- Most vulnerable to:
+  - Mid-day weather disruptions (2–5 PM)  
+  - Peak-hour traffic congestion  
+  - Sudden drops in order availability  
+- Cannot manually claim losses due to lack of time and complexity  
+
+This makes them an ideal candidate for a **fully automated, real-time income protection system**.
 
 ---
 
@@ -160,15 +178,66 @@ Payouts are automatically triggered when predefined thresholds are met:
 
 ---
 
-## AI/ML Integration
+## 🧠 AI/ML Integration
 
-### 1. Risk Prediction
-- Predicts disruption likelihood using historical and real-time data
-- Dynamically adjusts premiums
+### 🔹 AI Decision Pipeline (How the System Works)
 
-### 2. Income Estimation
-- Estimates hourly earning potential
-- Computes precise loss during disruptions
+The system follows a structured AI pipeline to make real-time decisions:
+
+#### Step 1: Data Ingestion
+- Weather data (rainfall, temperature, AQI)
+- Traffic congestion levels (mock/API)
+- Platform activity (order frequency, availability)
+- User historical earnings and activity
+
+---
+
+#### Step 2: Feature Engineering
+The system derives key features such as:
+- Zone risk score (based on historical disruptions)
+- User earning rate (₹/hour)
+- Activity consistency score
+- Disruption severity index
+
+---
+
+#### Step 3: Risk Prediction Model
+- A lightweight ML model predicts:
+  - Probability of disruption in a given time window
+  - Expected reduction in working hours
+- Uses historical + real-time signals
+
+---
+
+#### Step 4: Loss Estimation Engine
+- Calculates:
+  - Lost working hours
+  - Expected income loss  
+- Formula:
+  - **Loss = Hourly Income × Disruption Duration × Severity Factor**
+
+---
+
+#### Step 5: Decision Engine
+- Determines:
+  - Whether parametric trigger conditions are satisfied  
+  - Whether the claim is valid (fraud-checked)  
+  - Final payout amount  
+
+---
+
+### 🔹 Key AI Capabilities
+
+#### 1. Risk Prediction
+- Predicts disruption likelihood and adjusts weekly premium dynamically  
+
+#### 2. Income Estimation
+- Learns user earning patterns and computes accurate loss  
+
+#### 3. Fraud Detection
+- Uses behavioral signals and anomaly detection to identify spoofing and coordinated fraud  
+
+This pipeline ensures that decisions are **data-driven, explainable, and real-time**.
 
 ---
 
