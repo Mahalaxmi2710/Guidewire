@@ -383,21 +383,43 @@ A web-based platform is selected for:
 - Global Risk Mode helps prevent excessive payouts during extreme events
 - Serverless architecture (Firebase) reduces infrastructure costs and operational burn
 ---
-## 🎥 Demo Video (Phase 2)
+## 🎥 Demo Videos
 
-1. User onboarding and risk profiling
-2. ML-based premium calculation
-3. Display of premium explainability breakdown
-4. Simulation of disruption (weather/traffic)
-5. Automatic claim triggering and processing
-6. Dashboard updates with claim and coverage status
-7. Admin analytics and global risk control demonstration
+### 🎬 Phase 1 Demo
+
+This video demonstrates the **initial prototype** of the platform, including:
+
+- Basic user onboarding
+- Static premium calculation
+- Initial parametric trigger simulation
+- Basic worker dashboard
+- Early claim triggering workflow
 
 ▶️ **YouTube:**  
-🔗 [Watch Demo Video](https://youtube.com/shorts/EpotfirkuqI?si=v5Hv76-XDUlsIbal)
+🔗 [Watch Phase 1 Demo](https://youtu.be/jmP7v9wbZyI?si=q4CgNFiuWonS65Me)
 
 📁 **Google Drive:**  
-🔗 [Access Video on Drive](https://drive.google.com/file/d/1W-gcChPP8-ZpHZMSChuGm7erVcLfKN0E/view?usp=sharing)
+🔗 [Access Phase 1 Video](https://drive.google.com/file/d/17f5XCks1wN_KdyB2XuG9vBGZl0podxBY/view?usp=sharing)
+
+---
+
+### 🚀 Phase 2 Demo
+
+This video demonstrates the **enhanced AI-powered system**, including:
+
+1. User onboarding and risk profiling  
+2. ML-based premium calculation  
+3. Display of premium explainability breakdown  
+4. Simulation of disruption (weather/traffic)  
+5. Automatic claim triggering and processing  
+6. Dashboard updates with claim and coverage status  
+7. Admin analytics and global risk control demonstration  
+
+▶️ **YouTube:**  
+🔗 [Watch Phase 2 Demo](https://youtube.com/shorts/EpotfirkuqI?si=v5Hv76-XDUlsIbal)
+
+📁 **Google Drive:**  
+🔗 [Access Phase 2 Video](https://drive.google.com/file/d/1W-gcChPP8-ZpHZMSChuGm7erVcLfKN0E/view?usp=sharing)
 
 ---
 ## 🏆 Differentiation
