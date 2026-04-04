@@ -383,7 +383,7 @@ A web-based platform is selected for:
 - Global Risk Mode helps prevent excessive payouts during extreme events
 - Serverless architecture (Firebase) reduces infrastructure costs and operational burn
 ---
-## 🎥 Demo Video
+## 🎥 Demo Video (Phase 2)
 
 1. User onboarding and risk profiling
 2. ML-based premium calculation
@@ -394,10 +394,10 @@ A web-based platform is selected for:
 7. Admin analytics and global risk control demonstration
 
 ▶️ **YouTube:**  
-🔗 [Watch Demo Video](https://youtu.be/jmP7v9wbZyI?si=q4CgNFiuWonS65Me)
+🔗 [Watch Demo Video](https://youtube.com/shorts/EpotfirkuqI?si=v5Hv76-XDUlsIbal)
 
 📁 **Google Drive:**  
-🔗 [Access Video on Drive](https://drive.google.com/file/d/17f5XCks1wN_KdyB2XuG9vBGZl0podxBY/view?usp=sharing)
+🔗 [Access Video on Drive](https://drive.google.com/file/d/1W-gcChPP8-ZpHZMSChuGm7erVcLfKN0E/view?usp=sharing)
 
 ---
 ## 🏆 Differentiation
