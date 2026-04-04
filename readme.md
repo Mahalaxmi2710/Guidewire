@@ -256,7 +256,7 @@ The following components are fully implemented in the current system:
 
 - ML Model: Lightweight Decision Tree trained on synthetic, domain-aligned data and exported to JavaScript for in-browser execution
 - Dataset: Generated using Python (NumPy & Pandas) simulating realistic urban disruption conditions (rainfall, temperature, AQI, traffic, earnings)
-- Weather System: Mock-based implementation with optional real API integration (OpenWeather)
+- Weather System: Mock-based implementation with optional real API integration (Open Meteo)
 - Traffic Modeling: Simulated congestion values used as normalized inputs for risk scoring
 - Claims Engine: Automated parametric trigger system with rule-based validation and payout simulation
 - Policy Management: Coverage details, exclusions, and policy lifecycle management
