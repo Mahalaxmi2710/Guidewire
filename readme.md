@@ -48,6 +48,17 @@ The proposed system is a **hyper-local, earnings-aware, parametric insurance pla
 - Suggests **adaptive work strategies to reduce potential income loss**
 - Automatically detects loss and triggers **instant payouts without manual claims**
 
+## 🚀 Key Features (Phase 2)
+
+- AI-based dynamic premium calculation using a decision tree model
+- Fully automated parametric claim triggering
+- Micro-zone risk modeling for personalized pricing
+- Policy Management with coverage details and exclusions
+- Premium explainability panel for transparency
+- Worker ROI and protection dashboard
+- Admin analytics dashboard with risk insights
+- Global Risk Mode for extreme scenarios
+
 ---
 
 ## Key Innovations
@@ -239,6 +250,18 @@ The system derives key features such as:
 
 This pipeline ensures that decisions are **data-driven, explainable, and real-time**.
 
+## ✅ Phase 2 Implementation
+
+The following components are fully implemented in the current system:
+
+- ML Model: Lightweight Decision Tree trained on synthetic, domain-aligned data and exported to JavaScript for in-browser execution
+- Dataset: Generated using Python (NumPy & Pandas) simulating realistic urban disruption conditions (rainfall, temperature, AQI, traffic, earnings)
+- Weather System: Mock-based implementation with optional real API integration (OpenWeather)
+- Traffic Modeling: Simulated congestion values used as normalized inputs for risk scoring
+- Claims Engine: Automated parametric trigger system with rule-based validation and payout simulation
+- Policy Management: Coverage details, exclusions, and policy lifecycle management
+- Dashboard: Worker and Admin dashboards with real-time updates and analytics
+- Backend: Firebase (Firestore + Authentication) for data storage and user management
 ---
 
 ## Adversarial Defense & Anti-Spoofing Strategy
@@ -295,7 +318,7 @@ The system uses a **serverless, event-driven architecture**:
 
 ---
 
-## Blockchain Integration
+## 🔮 Future Scope: Blockchain Integration
 
 A lightweight blockchain layer can be integrated for:
 
@@ -352,16 +375,23 @@ A web-based platform is selected for:
 - Blockchain: Ethereum (Sepolia testnet)
 
 ---
+## 💰 Sustainability & Profit Model
 
+- Premiums are dynamically adjusted using ML-based risk scoring
+- Payouts are controlled through predefined parametric trigger thresholds
+- Loss ratio (Total Payout / Total Premium) is monitored to ensure profitability
+- Global Risk Mode helps prevent excessive payouts during extreme events
+- Serverless architecture (Firebase) reduces infrastructure costs and operational burn
+---
 ## 🎥 Demo Video
 
-This video demonstrates the complete workflow of the platform, including:
-
-- Registration and onboarding  
-- AI-driven premium calculation  
-- Real-time disruption monitoring  
-- Automated claim triggering and payout simulation  
-- Fraud detection handling  
+1. User onboarding and risk profiling
+2. ML-based premium calculation
+3. Display of premium explainability breakdown
+4. Simulation of disruption (weather/traffic)
+5. Automatic claim triggering and processing
+6. Dashboard updates with claim and coverage status
+7. Admin analytics and global risk control demonstration
 
 ▶️ **YouTube:**  
 🔗 [Watch Demo Video](https://youtu.be/jmP7v9wbZyI?si=q4CgNFiuWonS65Me)
@@ -370,3 +400,10 @@ This video demonstrates the complete workflow of the platform, including:
 🔗 [Access Video on Drive](https://drive.google.com/file/d/17f5XCks1wN_KdyB2XuG9vBGZl0podxBY/view?usp=sharing)
 
 ---
+## 🏆 Differentiation
+
+- Real-time parametric insurance with zero manual claims
+- Fully client-side ML for fast and reliable predictions
+- Explainable pricing model for user transparency
+- Cost-efficient serverless architecture
+- Profit-aware design with actuarial insights
