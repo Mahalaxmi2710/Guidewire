@@ -92,3 +92,9 @@ export const P = {
   trending: "M23 6l-9.5 9.5-5-5L1 18M17 6h6v6",
   back:     "M19 12H5M12 19l-7-7 7-7",
 };
+
+/* ── Global Risk Constraint Defaults (mirrors globalRisk.js for UI display) ── */
+export const GLOBAL_RISK_CONSTRAINTS = {
+  heightened: { premiumMultiplier: 1.5, maxClaims: 2, coverageRatio: 0.50, label: "Heightened" },
+  normal:     { premiumMultiplier: 1.0, maxClaims: 3, coverageRatio: 0.65, label: "Normal"     },
+};

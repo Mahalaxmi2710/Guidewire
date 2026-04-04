@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Phase 2 Artifacts
+.env
+.env*.local
+phase2 updations/
+.eslintcache
+*.txt

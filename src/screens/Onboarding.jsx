@@ -1,11 +1,13 @@
 // ─────────────────────────────────────────────────────────────
-//  RideSure — Screen: Onboarding (3 steps)
+//  RideSure — Screen: Onboarding (3 steps + T&C modal)
 //  Step 0 → Identity  |  Step 1 → Zone  |  Step 2 → Earnings
+//  After Step 2: T&C modal must be accepted before proceed.
 // ─────────────────────────────────────────────────────────────
 import { useState } from "react";
-import { DS, ZONES, PLATFORMS, RISK_META, P } from "../constants.js";
+import { DS, ZONES, PLATFORMS, RISK_META } from "../constants.js";
 import { Logo, StepBar, GlowBtn, Input, Badge, Bar, Card, SectionLabel } from "../components/ui.jsx";
 import { computeMaxPayout } from "../lib/backend.js";
+import TermsModal from "../components/TermsModal.jsx";
 
 const STEPS = ["Identity", "Zone", "Earnings"];
 
@@ -69,7 +71,7 @@ function StepZone({ form, setForm, errors }) {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {ZONES.map(z => {
-          const rm = RISK_META[z.risk];
+          const rm  = RISK_META[z.risk];
           const sel = form.zone?.id === z.id;
           return (
             <button key={z.id} onClick={() => set("zone", z)}
@@ -84,8 +86,7 @@ function StepZone({ form, setForm, errors }) {
                   <div style={{
                     width: 36, height: 36, borderRadius: 10, flexShrink: 0,
                     background: rm.bg, border: `1px solid ${rm.border}`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: "1rem",
+                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem",
                   }}>📍</div>
                   <div>
                     <div style={{ color: "#fff", fontWeight: 700, fontSize: "0.88rem" }}>{z.name}</div>
@@ -101,9 +102,9 @@ function StepZone({ form, setForm, errors }) {
               {sel && (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
                   {[
-                    ["Flood", z.flood,  z.flood  > 60 ? DS.red : z.flood  > 35 ? DS.accent2 : DS.green],
-                    ["Rain",  z.rain,   z.rain   > 60 ? DS.red : z.rain   > 35 ? DS.accent2 : DS.green],
-                    ["AQI",   z.aqi,    z.aqi    > 60 ? DS.red : z.aqi    > 35 ? DS.accent2 : DS.green],
+                    ["Flood", z.flood, z.flood > 60 ? DS.red : z.flood > 35 ? DS.accent2 : DS.green],
+                    ["Rain",  z.rain,  z.rain  > 60 ? DS.red : z.rain  > 35 ? DS.accent2 : DS.green],
+                    ["AQI",   z.aqi,   z.aqi   > 60 ? DS.red : z.aqi   > 35 ? DS.accent2 : DS.green],
                   ].map(([lbl, val, c]) => (
                     <div key={lbl} style={{ borderRadius: 10, padding: 10, background: "rgba(255,255,255,0.04)" }}>
                       <div style={{ fontSize: "0.68rem", color: DS.muted, marginBottom: 6 }}>{lbl} Index</div>
@@ -123,7 +124,7 @@ function StepZone({ form, setForm, errors }) {
 
 /* ── Step 2: Earnings ──────────────────────────────────────── */
 function StepEarnings({ form, setForm }) {
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const set       = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const maxPayout = computeMaxPayout(form.daily);
 
   return (
@@ -155,10 +156,10 @@ function StepEarnings({ form, setForm }) {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
         {[
-          { l: "Weekly income",   v: `₹${(form.daily * 7).toLocaleString("en-IN")}`, c: "#fff" },
-          { l: "Monthly estimate",v: `₹${(form.daily * 26).toLocaleString("en-IN")}`,c: "#fff" },
-          { l: "Max weekly payout",v:`₹${maxPayout.toLocaleString("en-IN")}`,         c: DS.green },
-          { l: "Coverage ratio",  v: "65%",                                            c: DS.blue },
+          { l: "Weekly income",    v: `₹${(form.daily * 7).toLocaleString("en-IN")}`,  c: "#fff" },
+          { l: "Monthly estimate", v: `₹${(form.daily * 26).toLocaleString("en-IN")}`, c: "#fff" },
+          { l: "Max weekly payout",v: `₹${maxPayout.toLocaleString("en-IN")}`,         c: DS.green },
+          { l: "Coverage ratio",   v: "65%",                                           c: DS.blue  },
         ].map(s => (
           <Card key={s.l} padding="14px">
             <div style={{ fontSize: "0.68rem", color: DS.muted, marginBottom: 4 }}>{s.l}</div>
@@ -189,26 +190,36 @@ function StepEarnings({ form, setForm }) {
           ))}
         </div>
       </div>
+
+      {/* T&C notice */}
+      <div style={{ marginTop: 20, padding: "10px 13px", borderRadius: 10, background: `${DS.accent2}0f`, border: `1px solid ${DS.accent2}25` }}>
+        <div style={{ fontSize: "0.68rem", color: DS.accent2, fontWeight: 700, marginBottom: 3 }}>📜 Next: Terms & Conditions</div>
+        <div style={{ fontSize: "0.65rem", color: DS.muted, lineHeight: 1.5 }}>
+          Clicking Continue will show our Terms & Conditions — including war/pandemic exclusions, dynamic pricing policy, and liability limits. You must accept before creating your profile.
+        </div>
+      </div>
     </div>
   );
 }
 
 /* ── Main Onboarding Screen ────────────────────────────────── */
 export default function Onboarding({ onComplete, onBack }) {
-  const [step, setStep] = useState(0);
-  const [form, setForm] = useState({
+  const [step,          setStep]          = useState(0);
+  const [form,          setForm]          = useState({
     name: "", phone: "", email: "",
     platform: null, zone: null,
     daily: 600, peakShift: "both",
   });
-  const [errors, setErrors] = useState({});
+  const [errors,        setErrors]        = useState({});
+  const [showTerms,     setShowTerms]     = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const validate = () => {
     const e = {};
     if (step === 0) {
-      if (!form.name.trim())              e.name     = "Name required";
-      if (!/^[6-9]\d{9}$/.test(form.phone)) e.phone = "Valid 10-digit mobile needed";
-      if (!form.platform)                 e.platform = "Choose your platform";
+      if (!form.name.trim())                  e.name     = "Name required";
+      if (!/^[6-9]\d{9}$/.test(form.phone))  e.phone    = "Valid 10-digit mobile needed";
+      if (!form.platform)                     e.platform = "Choose your platform";
     }
     if (step === 1 && !form.zone) e.zone = "Select your working zone";
     setErrors(e);
@@ -217,12 +228,31 @@ export default function Onboarding({ onComplete, onBack }) {
 
   const next = () => {
     if (!validate()) return;
-    if (step < 2) setStep(s => s + 1);
-    else onComplete(form);
+    if (step < 2) {
+      setStep(s => s + 1);
+    } else {
+      // Step 2 done → show T&C modal
+      setShowTerms(true);
+    }
+  };
+
+  const handleAcceptTerms = () => {
+    setTermsAccepted(true);
+    setShowTerms(false);
+    onComplete({ ...form, termsAccepted: true });
+  };
+
+  const handleDeclineTerms = () => {
+    setShowTerms(false);
   };
 
   return (
     <div style={{ minHeight: "100vh", background: DS.bg, display: "flex", flexDirection: "column" }}>
+
+      {/* T&C Modal (full-screen overlay) */}
+      {showTerms && (
+        <TermsModal onAccept={handleAcceptTerms} onDecline={handleDeclineTerms} />
+      )}
 
       {/* Header */}
       <div style={{ padding: "32px 20px 16px", flexShrink: 0 }}>
@@ -242,7 +272,7 @@ export default function Onboarding({ onComplete, onBack }) {
       {/* Footer */}
       <div style={{ padding: "16px 20px 32px", flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}>
         <GlowBtn onClick={next} disabled={step === 1 && !form.zone}>
-          {step === 2 ? "Compute My Risk Profile →" : "Continue →"}
+          {step === 2 ? "Review Terms & Continue →" : "Continue →"}
         </GlowBtn>
         {step > 0 && (
           <button onClick={() => setStep(s => s - 1)}
