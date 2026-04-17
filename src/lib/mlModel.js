@@ -202,9 +202,10 @@ export function predictPremium(zone, dailyEarning, peakShift = "both") {
 
 // ── Loss Estimation (unchanged formula, still correct) ────────
 export function estimateLoss(dailyEarning, disruptionHours, severityFactor) {
-  const hourlyRate = dailyEarning / 10;
-  return Math.round(hourlyRate * disruptionHours * severityFactor);
+  const hourlyRate = (Number(dailyEarning) || 0) / 10;
+  return Math.round(hourlyRate * (Number(disruptionHours) || 0) * (Number(severityFactor) || 0));
 }
+
 
 // ── Max Payout ────────────────────────────────────────────────
 export function maxWeeklyPayout(dailyEarning) {
