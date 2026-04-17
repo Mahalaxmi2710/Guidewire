@@ -26,6 +26,12 @@ const ZONE_BASELINES = {
   tambaram:   { rainfall: 12, temperature: 34, aqi: 108, traffic: 48 },
 };
 
+// ── Demo Overrides ────────────────────────────────────────────
+let _demoOverwrites = {};
+export function setDemoWeather(zoneId, data) { _demoOverwrites[zoneId] = { ...data, source: "demo" }; }
+export function clearDemoWeather(zoneId) { if(zoneId) delete _demoOverwrites[zoneId]; else _demoOverwrites = {}; }
+export function isDemoActive() { return Object.keys(_demoOverwrites).length > 0; }
+
 // ── In-Memory Cache (15-min TTL) ──────────────────────────────
 const CACHE_TTL_MS = 15 * 60 * 1000;
 const _cache       = new Map();
@@ -137,6 +143,11 @@ function mockWeather(zoneId) {
  * Results are cached for 15 minutes per zone.
  */
 export async function fetchWeather(zoneId) {
+  if (_demoOverwrites[zoneId]) {
+    console.log(`[WeatherAPI] DEMO MODE active for ${zoneId}`);
+    return { ..._demoOverwrites[zoneId], fetchedAt: Date.now() };
+  }
+
   const cached = getCached(zoneId);
   if (cached) return cached;
 

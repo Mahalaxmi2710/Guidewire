@@ -227,3 +227,295 @@ export const WeatherMock = {
     });
   },
 };
+
+/* ════════════════════════════════════════════════════════════
+   AUTOMATED CLAIM PIPELINE
+   Compatible with triggerMonitor.js orchestration flow:
+     trigger detected
+     → createClaim()   auto-creates + fraud check
+     → approveClaim()  approves + triggers payout
+     → updateWallet()  credits worker Firestore wallet
+     → notifyWorker()  in-app + console notification
+
+   All functions are async, handle their own errors, and return
+   structured result objects safe for triggerMonitor to log.
+   ════════════════════════════════════════════════════════════ */
+
+import { DB }                from "./firebase.js";
+import { processPayout }     from "./paymentGateway.js";
+import { evaluateFraud }     from "./fraudDetection.js";
+
+// ── Internal ID generator ─────────────────────────────────────
+const _pid = (p) =>
+  `${p}_${Date.now()}_${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+
+// ── 1. createClaim ────────────────────────────────────────────
+/**
+ * Auto-creates a parametric claim from a trigger event, runs fraud
+ * detection, and persists it to Firestore with the correct initial status.
+ *
+ * Called by: triggerMonitor.processClaim()
+ *
+ * @param {object} policy          - Active policy document from Firestore
+ * @param {object} evaluation      - evaluatePolicy() result
+ *   { triggered, triggers[], totalPayout, disruptionScore }
+ * @param {object} disruptionData  - Unified snapshot from disruptionAggregator
+ * @param {object} [workerData]    - Worker profile + earnings (for fraud check)
+ *
+ * @returns {Promise<object>} Persisted claim document with status set
+ */
+export async function createClaim(policy, evaluation, disruptionData, workerData = {}) {
+  const claimId  = _pid("CLM");
+  const workerId = policy.userId ?? policy.uid;
+
+  // ── Draft claim ─────────────────────────────────────────────
+  const draft = {
+    id:              claimId,
+    policyId:        policy.policyId,
+    uid:             workerId,
+    zoneId:          policy.zoneId ?? policy.zone ?? disruptionData?.zoneId ?? "unknown",
+    zone:            policy.zoneId ?? policy.zone ?? disruptionData?.zoneId ?? "unknown",
+    triggers:        evaluation.triggers  ?? [],
+    payoutAmount:    evaluation.totalPayout ?? 0,
+    disruptionScore: evaluation.disruptionScore ?? 0,
+    source:          "auto-trigger",
+    weather:         disruptionData?.breakdown?.weather ?? disruptionData?.weather ?? null,
+    traffic:         disruptionData?.breakdown?.traffic ?? disruptionData?.traffic ?? null,
+    demand:          disruptionData?.breakdown?.demand  ?? disruptionData?.demand  ?? null,
+    createdAt:       Date.now(),
+    status:          "pending",
+  };
+
+  // ── Fraud detection ─────────────────────────────────────────
+  let recentClaims = [];
+  try { recentClaims = await DB.getUserClaims(workerId); } catch (_) {}
+
+  const fraud = evaluateFraud(
+    draft,
+    { ...workerData, recentClaims },
+    disruptionData ?? {}
+  );
+
+  draft.fraudScore   = fraud.isFraud ? 80 : 10;
+  draft.fraudReasons = fraud.reasons;
+  draft.fraudChecks  = fraud.checks;
+
+  if (fraud.isFraud) {
+    draft.status   = "fraud-blocked";
+    draft.fraudFlag = true;
+    console.warn(`[Backend] createClaim BLOCKED ${claimId} | reasons:`, fraud.reasons);
+  } else {
+    draft.status   = "created";
+    draft.fraudFlag = false;
+  }
+
+  // ── Persist to Firestore ────────────────────────────────────
+  try {
+    await DB.saveClaim(draft);
+    console.log(`[Backend] createClaim ✓ ${claimId} | status=${draft.status}`);
+  } catch (dbErr) {
+    console.error(`[Backend] createClaim Firestore error:`, dbErr.message);
+  }
+
+  return draft;
+}
+
+// ── 2. approveClaim ───────────────────────────────────────────
+/**
+ * Approves a created claim (status must be "created"), triggers the
+ * payout via paymentGateway, and updates the claim status in Firestore.
+ *
+ * Called by: triggerMonitor.processClaim() after createClaim()
+ *
+ * @param {object} claim  - Draft claim from createClaim()
+ *
+ * @returns {Promise<object>} {
+ *   claim,          // updated claim document
+ *   receipt,        // payout receipt { transactionId, status, amount, method, timestamp }
+ *   approved: bool,
+ * }
+ */
+export async function approveClaim(claim) {
+  if (claim.status === "fraud-blocked") {
+    console.warn(`[Backend] approveClaim skipped — claim ${claim.id} is fraud-blocked`);
+    return { claim, receipt: null, approved: false };
+  }
+
+  if (!claim.payoutAmount || claim.payoutAmount <= 0) {
+    console.warn(`[Backend] approveClaim skipped — zero payout for claim ${claim.id}`);
+    return { claim, receipt: null, approved: false };
+  }
+
+  // ── Mark as approved ────────────────────────────────────────
+  claim.status     = "approved";
+  claim.approvedAt = Date.now();
+
+  // ── Trigger payout ──────────────────────────────────────────
+  let receipt = null;
+  try {
+    receipt = await processPayout(claim);       // claim-aware: { transactionId, status, amount, method, timestamp }
+    claim.txnId        = receipt.transactionId;
+    claim.payoutStatus = receipt.status;
+    claim.payoutMethod = receipt.method;
+    claim.status       = receipt.status === "success" ? "paid" : "payout-pending";
+
+    console.log(
+      `[Backend] approveClaim payout ✓ ${receipt.transactionId} | ₹${receipt.amount} via ${receipt.method}`
+    );
+  } catch (payErr) {
+    claim.status      = "payout-failed";
+    claim.payoutError = payErr.message;
+    console.error(`[Backend] approveClaim payout FAILED ${claim.id}:`, payErr.message);
+  }
+
+  // ── Update Firestore status ─────────────────────────────────
+  try {
+    await DB.updateClaimStatus(claim.id, claim.status);
+  } catch (dbErr) {
+    console.warn(`[Backend] approveClaim Firestore update failed:`, dbErr.message);
+  }
+
+  return { claim, receipt, approved: claim.status === "paid" };
+}
+
+// ── 3. updateWallet ───────────────────────────────────────────
+/**
+ * Credits the worker's Firestore wallet with the payout amount.
+ * Creates the wallet document if it doesn't exist.
+ * Appends a transaction entry to the history array (capped at 50).
+ *
+ * Called by: triggerMonitor after approveClaim() returns receipt
+ *
+ * @param {string} workerId
+ * @param {number} amount       - INR credit amount
+ * @param {string} claimId
+ * @param {string} txnId        - From payout receipt
+ *
+ * @returns {Promise<object>} Updated wallet document
+ */
+export async function updateWallet(workerId, amount, claimId, txnId) {
+  if (!workerId || !amount || amount <= 0) {
+    console.warn(`[Backend] updateWallet skipped — invalid params`, { workerId, amount });
+    return null;
+  }
+
+  try {
+    // Read existing wallet (graceful if not found)
+    const existing = await DB.getWallet?.(workerId).catch(() => null);
+    const prevBalance = existing?.balance ?? 0;
+    const newBalance  = prevBalance + amount;
+
+    const walletDoc = {
+      workerId,
+      balance:     newBalance,
+      lastCredit:  amount,
+      lastClaimId: claimId,
+      lastTxnId:   txnId,
+      updatedAt:   Date.now(),
+      history: [
+        ...(existing?.history ?? []).slice(-49),   // rolling 50-entry window
+        { type: "credit", amount, claimId, txnId, ts: Date.now() },
+      ],
+    };
+
+    await DB.saveWallet?.(workerId, walletDoc);
+    console.log(
+      `[Backend] updateWallet ✓ ${workerId} | +₹${amount} | balance=₹${newBalance}`
+    );
+    return walletDoc;
+  } catch (err) {
+    console.error(`[Backend] updateWallet error for ${workerId}:`, err.message);
+    return null;
+  }
+}
+
+// ── 4. notifyWorker (internal helper) ────────────────────────
+/**
+ * Sends an in-app notification to the worker after claim resolution.
+ * In production: POST to FCM / OneSignal push endpoint.
+ * Currently: persists to Firestore /notifications/{uid} and logs.
+ *
+ * @param {string} workerId
+ * @param {object} claim   - Resolved claim
+ * @param {object} receipt - Payout receipt (may be null for blocked claims)
+ */
+export async function notifyWorker(workerId, claim, receipt = null) {
+  const isPaid    = claim.status === "paid";
+  const isBlocked = claim.status === "fraud-blocked";
+
+  const notification = {
+    id:        _pid("NOTIF"),
+    uid:       workerId,
+    type:      isPaid ? "payout_credited" : isBlocked ? "claim_blocked" : "claim_update",
+    title:     isPaid
+                 ? `₹${receipt?.amount ?? claim.payoutAmount} Payout Credited`
+                 : isBlocked
+                 ? "Claim Flagged for Review"
+                 : `Claim ${claim.status}`,
+    body:      isPaid
+                 ? `Your parametric claim ${claim.id} has been approved and ₹${receipt?.amount} sent via ${receipt?.method ?? "wallet"}.`
+                 : isBlocked
+                 ? `Claim ${claim.id} was flagged: ${(claim.fraudReasons ?? []).join("; ")}`
+                 : `Your claim ${claim.id} status: ${claim.status}.`,
+    claimId:   claim.id,
+    amount:    receipt?.amount ?? claim.payoutAmount ?? 0,
+    method:    receipt?.method ?? null,
+    read:      false,
+    createdAt: Date.now(),
+  };
+
+  try {
+    await DB.saveNotification?.(workerId, notification);
+  } catch (_) {}
+
+  console.log(
+    `[Backend] notifyWorker → ${workerId} | type=${notification.type} | "${notification.title}"`
+  );
+
+  return notification;
+}
+
+// ── Full Pipeline Runner ──────────────────────────────────────
+/**
+ * runClaimPipeline(policy, evaluation, disruptionData, workerData?)
+ *
+ * Convenience orchestrator used by triggerMonitor.processClaim()
+ * to run the complete automated pipeline in one call.
+ *
+ * Steps:
+ *   1. createClaim   – fraud check + persist
+ *   2. approveClaim  – approve + payout
+ *   3. updateWallet  – credit Firestore wallet
+ *   4. notifyWorker  – push notification
+ *
+ * @returns {Promise<object>} { claim, receipt, wallet, notification }
+ */
+export async function runClaimPipeline(policy, evaluation, disruptionData, workerData = {}) {
+  // Step 1
+  const claim = await createClaim(policy, evaluation, disruptionData, workerData);
+
+  // Short-circuit if fraud-blocked
+  if (claim.status === "fraud-blocked") {
+    const notification = await notifyWorker(claim.uid, claim, null);
+    return { claim, receipt: null, wallet: null, notification };
+  }
+
+  // Step 2
+  const { claim: approvedClaim, receipt } = await approveClaim(claim);
+
+  // Step 3
+  let wallet = null;
+  if (receipt?.status === "success") {
+    wallet = await updateWallet(
+      approvedClaim.uid,
+      receipt.amount,
+      approvedClaim.id,
+      receipt.transactionId
+    );
+  }
+
+  // Step 4
+  const notification = await notifyWorker(approvedClaim.uid, approvedClaim, receipt);
+
+  return { claim: approvedClaim, receipt, wallet, notification };
+}

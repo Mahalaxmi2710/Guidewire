@@ -3,38 +3,50 @@
 //  Sensitivity table, actuarial depth, real DB indicator
 //  Global Risk Switch + Platform Activity Data
 // ─────────────────────────────────────────────────────────────
+import { useState } from "react";
 import { DS, ZONES, RISK_META, GLOBAL_RISK_CONSTRAINTS } from "../constants.js";
 import { Card, Bar, Badge, PulseDot, SectionLabel, StatBox } from "../components/ui.jsx";
 import { runSensitivityAnalysis, PLATFORM_STATS, computeLossRatio } from "../lib/actuarial.js";
 import { DB } from "../lib/firebase.js";
 import { getAllPlatformSummary } from "../lib/dataSchema.js";
 import { getCacheStats } from "../lib/weatherApi.js";
+import {
+  LossRatioPanel,
+  PredictiveClaimRiskPanel,
+  FraudAlertsPanel,
+  RegionalDisruptionPanel
+} from "../components/AdminDashboardPanels.jsx";
+import {
+  triggerFakeRainstorm,
+  toggleDemoMode,
+  isDemoMode
+} from "../lib/demoMode.js";
 
 const ML_PIPELINE = [
-  { step: "Data Ingestion",         status: "Live",    note: "Weather · Traffic · Platform APIs" },
-  { step: "Feature Engineering",    status: "Live",    note: "Zone score · Earning rate · Severity index" },
-  { step: "Risk Prediction Model",  status: "GBDT v1.2",note: "3-tree gradient boosted decision tree" },
-  { step: "Loss Estimation Engine", status: "Live",    note: "Income × Duration × Severity" },
-  { step: "Decision Engine",        status: "Live",    note: "Trigger eval · Fraud check · Payout calc" },
-  { step: "Blockchain Audit Log",   status: "Sepolia", note: "Ethereum testnet · Tamper-proof records" },
+  { step: "Data Ingestion", status: "Live", note: "Weather · Traffic · Platform APIs" },
+  { step: "Feature Engineering", status: "Live", note: "Zone score · Earning rate · Severity index" },
+  { step: "Risk Prediction Model", status: "GBDT v1.2", note: "3-tree gradient boosted decision tree" },
+  { step: "Loss Estimation Engine", status: "Live", note: "Income × Duration × Severity" },
+  { step: "Decision Engine", status: "Live", note: "Trigger eval · Fraud check · Payout calc" },
+  { step: "Blockchain Audit Log", status: "Sepolia", note: "Ethereum testnet · Tamper-proof records" },
 ];
 
 const FRAUD_CHECKS = [
-  { check: "GPS Spoofing Detection",    status: "Active",    ok: true },
-  { check: "Motion Pattern Analysis",   status: "Active",    ok: true },
-  { check: "Network Triangulation",     status: "Active",    ok: true },
-  { check: "Coordinated Claim Monitor", status: "Active",    ok: true },
-  { check: "Graph Anomaly Detector",    status: "Active",    ok: true },
-  { check: "Flagged Claims This Week",  status: "3 flagged", ok: false },
-  { check: "Partial-hold Payouts",      status: "2 pending", ok: false },
+  { check: "GPS Spoofing Detection", status: "Active", ok: true },
+  { check: "Motion Pattern Analysis", status: "Active", ok: true },
+  { check: "Network Triangulation", status: "Active", ok: true },
+  { check: "Coordinated Claim Monitor", status: "Active", ok: true },
+  { check: "Graph Anomaly Detector", status: "Active", ok: false },
+  { check: "Flagged Claims This Week", status: "3 flagged", ok: false },
+  { check: "Partial-hold Payouts", status: "2 pending", ok: false },
 ];
 
 const ALERTS = [
-  { zone: "Velachery",  msg: "Heavy rain 2–5 PM · 84% probability",  risk: "high" },
-  { zone: "Perambur",   msg: "AQI likely to breach 260",              risk: "high" },
-  { zone: "T. Nagar",   msg: "Peak traffic surge 6–8 PM",             risk: "medium" },
-  { zone: "Adyar",      msg: "Mild heat advisory 12–3 PM",            risk: "medium" },
-  { zone: "Anna Nagar", msg: "Conditions normal, low claim risk",     risk: "low" },
+  { zone: "Velachery", msg: "Heavy rain 2–5 PM · 84% probability", risk: "high" },
+  { zone: "Perambur", msg: "AQI likely to breach 260", risk: "high" },
+  { zone: "T. Nagar", msg: "Peak traffic surge 6–8 PM", risk: "medium" },
+  { zone: "Adyar", msg: "Mild heat advisory 12–3 PM", risk: "medium" },
+  { zone: "Anna Nagar", msg: "Conditions normal, low claim risk", risk: "low" },
 ];
 
 // ── Sensitivity Table ─────────────────────────────────────────
@@ -70,9 +82,11 @@ function SensitivityTable({ zoneId, dailyEarning, premium, globalRiskOn }) {
                   </span>
                 </td>
                 <td style={{ padding: "8px 4px" }}>
-                  <span style={{ fontSize: "0.65rem", fontWeight: 700, padding: "2px 6px", borderRadius: 4,
+                  <span style={{
+                    fontSize: "0.65rem", fontWeight: 700, padding: "2px 6px", borderRadius: 4,
                     background: r.viable ? `${DS.green}18` : `${DS.red}18`,
-                    color: r.viable ? DS.green : DS.red }}>
+                    color: r.viable ? DS.green : DS.red
+                  }}>
                     {r.viable ? "✓ Yes" : "✕ No"}
                   </span>
                 </td>
@@ -86,17 +100,58 @@ function SensitivityTable({ zoneId, dailyEarning, premium, globalRiskOn }) {
 }
 
 export default function AdminTab({ claimsCount = 0, selectedZone, selectedEarning, selectedPremium, globalRiskOn, onToggleGlobalRisk }) {
-  const zone    = selectedZone    || "velachery";
+  const [demoActive, setDemoActive] = useState(isDemoMode);
+  const [isTriggering, setIsTriggering] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (msg, type = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 2500);
+  };
+
+  const handleTriggerStorm = async () => {
+    setIsTriggering(true);
+    try {
+      await triggerFakeRainstorm("velachery");
+      showToast("🌩️ Demo Storm Triggered! Automated pipeline initiated.");
+    } catch (err) {
+      showToast("❌ Trigger failed: " + err.message, "warn");
+    } finally {
+      setIsTriggering(false);
+    }
+  };
+
+  const zone = selectedZone || "velachery";
   const earning = selectedEarning || 600;
   const premium = selectedPremium || 38;
-  
+
   const currentPremium = globalRiskOn ? Math.round(premium * 1.5) : premium;
-  const lr      = computeLossRatio(PLATFORM_STATS.totalPremiumsMonth, PLATFORM_STATS.totalPayoutsMonth);
+  const lr = computeLossRatio(PLATFORM_STATS.totalPremiumsMonth, PLATFORM_STATS.totalPayoutsMonth);
   const platformSummary = getAllPlatformSummary();
   const cache = getCacheStats();
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 13, position: "relative" }}>
+      
+      {/* Toast Notification Overlay */}
+      {toast && (
+        <div style={{
+          position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)",
+          zIndex: 1000, width: "90%", maxWidth: 350,
+          animation: "rs-fade-in 0.3s ease-out"
+        }}>
+          <div style={{
+            padding: "12px 16px", borderRadius: 12, fontWeight: 700, fontSize: "0.82rem",
+            background: toast.type === "warn" ? `${DS.red}EE` : `${DS.green}EE`,
+            color: "#fff", boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+            backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.1)",
+            display: "flex", alignItems: "center", gap: 8
+          }}>
+            <span>{toast.type === "warn" ? "⚠️" : "🌩️"}</span>
+            {toast.msg}
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <Card style={{ background: "linear-gradient(135deg,#1a1228,#13161F)" }} padding="15px">
@@ -109,11 +164,13 @@ export default function AdminTab({ claimsCount = 0, selectedZone, selectedEarnin
             </div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-            <div style={{ fontSize: "0.65rem", fontWeight: 700, padding: "4px 9px", borderRadius: 8,
-                background: DB.isLive() ? `${DS.green}18` : `${DS.accent2}18`,
-                color: DB.isLive() ? DS.green : DS.accent2,
-                border: `1px solid ${DB.isLive() ? DS.green : DS.accent2}40` }}>
-                {DB.isLive() ? "🟢 Firebase Live" : "🟡 Mock DB"}
+            <div style={{
+              fontSize: "0.65rem", fontWeight: 700, padding: "4px 9px", borderRadius: 8,
+              background: DB.isLive() ? `${DS.green}18` : `${DS.accent2}18`,
+              color: DB.isLive() ? DS.green : DS.accent2,
+              border: `1px solid ${DB.isLive() ? DS.green : DS.accent2}40`
+            }}>
+              {DB.isLive() ? "🟢 Firebase Live" : "🟡 Mock DB"}
             </div>
             <div style={{ fontSize: "0.55rem", color: DS.muted }}>Cache Hit Rate: {cache.hitRate}%</div>
           </div>
@@ -123,74 +180,109 @@ export default function AdminTab({ claimsCount = 0, selectedZone, selectedEarnin
       {/* Global Risk Toggle */}
       <Card border={`1.5px solid ${globalRiskOn ? DS.red : DS.border}`}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-                <SectionLabel>⚠️ Heightened Risk Mode</SectionLabel>
-                <div style={{ fontSize: "0.65rem", color: DS.muted, marginTop: -4 }}>
-                    Stricter pricing & coverage constraints
-                </div>
+          <div>
+            <SectionLabel>⚠️ Heightened Risk Mode</SectionLabel>
+            <div style={{ fontSize: "0.65rem", color: DS.muted, marginTop: -4 }}>
+              Stricter pricing & coverage constraints
             </div>
-            <button 
-                onClick={onToggleGlobalRisk}
-                style={{
-                    width: 50, height: 26, borderRadius: 13, cursor: "pointer",
-                    background: globalRiskOn ? DS.red : DS.surface,
-                    border: `1px solid ${globalRiskOn ? DS.red : DS.border}`,
-                    position: "relative", transition: "all 0.3s"
-                }}>
-                <div style={{
-                    width: 20, height: 20, borderRadius: "50%", background: "#fff",
-                    position: "absolute", top: 2, left: globalRiskOn ? 26 : 2,
-                    transition: "all 0.3s"
-                }} />
-            </button>
+          </div>
+          <button
+            onClick={onToggleGlobalRisk}
+            style={{
+              width: 50, height: 26, borderRadius: 13, cursor: "pointer",
+              background: globalRiskOn ? DS.red : DS.surface,
+              border: `1px solid ${globalRiskOn ? DS.red : DS.border}`,
+              position: "relative", transition: "all 0.3s"
+            }}>
+            <div style={{
+              width: 20, height: 20, borderRadius: "50%", background: "#fff",
+              position: "absolute", top: 2, left: globalRiskOn ? 26 : 2,
+              transition: "all 0.3s"
+            }} />
+          </button>
         </div>
         {globalRiskOn && (
-            <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: `${DS.red}10`, fontSize: "0.68rem", color: DS.red, lineHeight: 1.5 }}>
-                • Premium multiplier: 1.5x applied<br/>
-                • Max claims: 2 per week cap<br/>
-                • Coverage ratio: 50% max payout
-            </div>
+          <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: `${DS.red}10`, fontSize: "0.68rem", color: DS.red, lineHeight: 1.5 }}>
+            • Premium multiplier: 1.5x applied<br />
+            • Max claims: 2 per week cap<br />
+            • Coverage ratio: 50% max payout
+          </div>
         )}
       </Card>
 
       {/* KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9 }}>
-        <StatBox label="Active Policies"  value={PLATFORM_STATS.activePolicies.toLocaleString()} color={DS.blue}    sub="+12% WoW" />
-        <StatBox label="Weekly Revenue"   value={`₹${(PLATFORM_STATS.avgWeeklyPremium * PLATFORM_STATS.activePolicies / 1000).toFixed(0)}K`} color={DS.green} sub="₹31.4 avg" />
+        <StatBox label="Active Policies" value={PLATFORM_STATS.activePolicies.toLocaleString()} color={DS.blue} sub="+12% WoW" />
+        <StatBox label="Weekly Revenue" value={`₹${(PLATFORM_STATS.avgWeeklyPremium * PLATFORM_STATS.activePolicies / 1000).toFixed(0)}K`} color={DS.green} sub="₹31.4 avg" />
         <StatBox label="Claims Processed" value={String(claimsCount + PLATFORM_STATS.claimsThisWeek)} color={DS.accent} sub="Auto-approved" />
-        <StatBox label="Loss Ratio"       value={`${lr}%`} color={lr < 50 ? DS.green : lr < 70 ? DS.accent2 : DS.red} sub={lr < 70 ? "Healthy" : "Monitor"} />
+        <StatBox label="Loss Ratio" value={`${lr}%`} color={lr < 50 ? DS.green : lr < 70 ? DS.accent2 : DS.red} sub={lr < 70 ? "Healthy" : "Monitor"} />
       </div>
 
       {/* Sensitivity Analysis */}
       <SensitivityTable zoneId={zone} dailyEarning={earning} premium={premium} globalRiskOn={globalRiskOn} />
 
+      {/* NEW: Regional Disruption Analytics (Live Heatmap) */}
+      <RegionalDisruptionPanel />
+
+      {/* NEW: Predictive ML Risk & Loss Ratio */}
+      <PredictiveClaimRiskPanel selectedZone={zone} selectedEarning={earning} />
+
+      <LossRatioPanel globalRiskOn={globalRiskOn} claimsCount={claimsCount} />
+
+      {/* NEW: Fraud Alerts Feed */}
+      <FraudAlertsPanel />
+
+      {/* NEW: Demo Controller (Test Suite) */}
+      <Card style={{ background: `${DS.accent}10`, border: `1px solid ${DS.accent}30` }}>
+        <SectionLabel>🧪 Demo Controller (Phase 3 Testing)</SectionLabel>
+        <div style={{ fontSize: "0.65rem", color: DS.muted, marginBottom: 12 }}>
+          Simulate extreme disruption events to test the automated claim pipeline instantly.
+        </div>
+        <div style={{ display: "flex", gap: 9 }}>
+          <button
+            onClick={() => {
+              const newState = toggleDemoMode();
+              setDemoActive(newState);
+            }}
+            style={{ flex: 1, padding: "10px", borderRadius: 10, background: demoActive ? DS.accent : DS.surface, border: `1px solid ${DS.border}`, color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: "0.74rem" }}>
+            {demoActive ? "✅ Demo Mode On" : "🔘 Demo Mode Off"}
+          </button>
+          <button
+            onClick={handleTriggerStorm}
+            disabled={!demoActive || isTriggering}
+            style={{ flex: 1, padding: "10px", borderRadius: 10, background: DS.red, opacity: (demoActive && !isTriggering) ? 1 : 0.4, border: "none", color: "#fff", fontWeight: 700, cursor: (demoActive && !isTriggering) ? "pointer" : "not-allowed", fontSize: "0.74rem" }}>
+            {isTriggering ? "⛈️ Processing..." : "🌩️ Trigger Storm"}
+          </button>
+        </div>
+      </Card>
+
       {/* Platform Activity */}
       <Card>
-          <SectionLabel>📊 City Platform Activity (7d avg)</SectionLabel>
-          <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.7rem" }}>
-                  <thead>
-                      <tr style={{ color: DS.muted, borderBottom: `1px solid ${DS.border}` }}>
-                          <th style={{ textAlign: "left", padding: "6px 2px" }}>City</th>
-                          <th style={{ textAlign: "right", padding: "6px 2px" }}>Orders</th>
-                          <th style={{ textAlign: "right", padding: "6px 2px" }}>Riders</th>
-                          <th style={{ textAlign: "right", padding: "6px 2px" }}>D/S Ratio</th>
-                          <th style={{ textAlign: "right", padding: "6px 2px" }}>Time</th>
-                      </tr>
-                  </thead>
-                  <tbody>
-                      {platformSummary.map(p => (
-                          <tr key={p.city} style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
-                              <td style={{ padding: "8px 2px", color: "#fff", fontWeight: 700, textTransform: "capitalize" }}>{p.city.replace("_", " ")}</td>
-                              <td style={{ padding: "8px 2px", textAlign: "right", color: DS.blue }}>{p.avgOrders}</td>
-                              <td style={{ padding: "8px 2px", textAlign: "right", color: "#fff" }}>{p.avgRiders}</td>
-                              <td style={{ padding: "8px 2px", textAlign: "right", color: p.avgRatio > 8 ? DS.red : p.avgRatio > 6 ? DS.accent2 : DS.green }}>{p.avgRatio}</td>
-                              <td style={{ padding: "8px 2px", textAlign: "right", color: DS.muted }}>{p.avgTime}m</td>
-                          </tr>
-                      ))}
-                  </tbody>
-              </table>
-          </div>
+        <SectionLabel>📊 City Platform Activity (7d avg)</SectionLabel>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.7rem" }}>
+            <thead>
+              <tr style={{ color: DS.muted, borderBottom: `1px solid ${DS.border}` }}>
+                <th style={{ textAlign: "left", padding: "6px 2px" }}>City</th>
+                <th style={{ textAlign: "right", padding: "6px 2px" }}>Orders</th>
+                <th style={{ textAlign: "right", padding: "6px 2px" }}>Riders</th>
+                <th style={{ textAlign: "right", padding: "6px 2px" }}>D/S Ratio</th>
+                <th style={{ textAlign: "right", padding: "6px 2px" }}>Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {platformSummary.map(p => (
+                <tr key={p.city} style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+                  <td style={{ padding: "8px 2px", color: "#fff", fontWeight: 700, textTransform: "capitalize" }}>{p.city.replace("_", " ")}</td>
+                  <td style={{ padding: "8px 2px", textAlign: "right", color: DS.blue }}>{p.avgOrders}</td>
+                  <td style={{ padding: "8px 2px", textAlign: "right", color: "#fff" }}>{p.avgRiders}</td>
+                  <td style={{ padding: "8px 2px", textAlign: "right", color: p.avgRatio > 8 ? DS.red : p.avgRatio > 6 ? DS.accent2 : DS.green }}>{p.avgRatio}</td>
+                  <td style={{ padding: "8px 2px", textAlign: "right", color: DS.muted }}>{p.avgTime}m</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </Card>
 
       {/* Zone heatmap */}

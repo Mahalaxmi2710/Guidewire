@@ -5,21 +5,23 @@
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
 import { GlobalStyles } from "./components/ui.jsx";
-import Landing          from "./screens/Landing.jsx";
-import Onboarding       from "./screens/Onboarding.jsx";
-import RiskProfile      from "./screens/RiskProfile.jsx";
-import Dashboard        from "./screens/Dashboard.jsx";
+import Landing from "./screens/Landing.jsx";
+import Onboarding from "./screens/Onboarding.jsx";
+import RiskProfile from "./screens/RiskProfile.jsx";
+import Dashboard from "./screens/Dashboard.jsx";
 import PolicyManagement from "./screens/PolicyManagement.jsx";
 import ClaimsManagement from "./screens/ClaimsManagement.jsx";
-import { GlobalRisk }   from "./lib/globalRisk.js";
+import { Auth, DB, initFirebase } from "./lib/firebase.js";
+import { GlobalRisk } from "./lib/globalRisk.js";
 import GlobalRiskBanner from "./components/GlobalRiskBanner.jsx";
+import { startTriggerMonitor, stopTriggerMonitor } from "./services/triggerMonitor.js";
 
 /* ── History Stack Router ────────────────────────────────────── */
 function useRouter(initial) {
   const [stack, setStack] = useState([{ screen: initial }]);
   const current = stack[stack.length - 1];
   const push = (screen) => setStack(s => [...s, { screen }]);
-  const pop  = () => setStack(s => s.length > 1 ? s.slice(0, -1) : s);
+  const pop = () => setStack(s => s.length > 1 ? s.slice(0, -1) : s);
   const replace = (screen) => setStack([{ screen }]);
   return { screen: current.screen, push, pop, replace };
 }
@@ -28,14 +30,22 @@ function useRouter(initial) {
 export default function App() {
   const router = useRouter("landing");
 
-  const [userData,   setUserData]   = useState(null);
+  const [userData, setUserData] = useState(null);
   const [policyData, setPolicyData] = useState(null);
   const [globalRiskOn, setGlobalRiskOn] = useState(GlobalRisk.isOn());
 
   // Subscribe to Global Risk changes
   useEffect(() => {
+    initFirebase();
     const unsub = GlobalRisk.subscribe(setGlobalRiskOn);
-    return unsub;
+
+    // Start background monitor (30s interval for demo/stable testing)
+    const monitor = startTriggerMonitor({ intervalMs: 30000 });
+
+    return () => {
+      unsub();
+      stopTriggerMonitor();
+    };
   }, []);
 
   const handleLogout = () => {
@@ -57,9 +67,9 @@ export default function App() {
       case "onboard":
         return (
           <Onboarding
-            onComplete={data => { 
-                setUserData(data); 
-                router.push("risk"); 
+            onComplete={data => {
+              setUserData(data);
+              router.push("risk");
             }}
             onBack={() => router.pop()}
           />
@@ -69,9 +79,9 @@ export default function App() {
         return userData ? (
           <RiskProfile
             user={userData}
-            onActivate={policy => { 
-                setPolicyData(policy); 
-                router.push("dashboard"); 
+            onActivate={policy => {
+              setPolicyData(policy);
+              router.push("dashboard");
             }}
             onBack={() => router.pop()}
           />

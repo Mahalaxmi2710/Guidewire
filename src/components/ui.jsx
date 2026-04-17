@@ -275,6 +275,10 @@ export function GlobalStyles() {
         0%, 100% { opacity: 1; }
         50% { opacity: 0.45; }
       }
+      @keyframes rs-fade-in {
+        from { opacity: 0; transform: translate(-50%, -20px); }
+        to { opacity: 1; transform: translate(-50%, 0); }
+      }
       .rs-pulse { animation: rs-pulse 2s ease-in-out infinite; }
     `}</style>
   );

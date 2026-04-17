@@ -12,6 +12,12 @@ import { fetchWeather } from "../lib/weatherApi.js";
 import { DB, Razorpay } from "../lib/firebase.js";
 import { seedUserEarnings, getWeeklyAvgEarnings } from "../lib/dataSchema.js";
 import WeeklyPricingCard from "../components/WeeklyPricingCard.jsx";
+import { 
+  ActiveCoveragePanel, 
+  EarningsProtectedPanel, 
+  LastPayoutsPanel, 
+  DisruptionAlertsPanel 
+} from "../components/WorkerDashboardPanels.jsx";
 
 // ── Claim Progress Indicator ──────────────────────────────────
 function ClaimProgress({ stage }) {
@@ -201,16 +207,20 @@ export default function WorkerTab({ user, policy, onOpenPolicy, onOpenClaims, gl
         </div>
       </Card>
 
-      {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9 }}>
-        <StatBox label="Weekly Premium"  value={`₹${currentPremium}`}                        color={globalRiskOn ? DS.red : DS.accent}  sub="est. dynamic" />
-        <StatBox label="Max Payout"      value={`₹${policy.maxPayout.toLocaleString("en-IN")}`} color={DS.green}   sub="this week" />
-        <StatBox label="Claims Paid"     value={`₹${totalPaid.toLocaleString("en-IN")}`}      color={DS.blue}    sub={`${claims.length} payout${claims.length !== 1 ? "s" : ""}`} />
-        <StatBox label="ROI"             value={`${roi.roiPct > 0 ? "+" : ""}${roi.roiPct}%`} color={roi.roiPct >= 0 ? DS.green : DS.red} sub="on premium" />
-      </div>
+      {/* Active Coverage & Earnings Protection */}
+      <ActiveCoveragePanel policy={policy} globalRiskOn={globalRiskOn} premium={currentPremium} />
+      
+      <EarningsProtectedPanel 
+        weeklyAvgEarnings={getWeeklyAvgEarnings(user.phone)} 
+        policy={policy} 
+        claimsPaid={totalPaid} 
+      />
 
-      {/* Dynamic Pricing Card */}
-      {pricing && <WeeklyPricingCard result={pricing} globalRiskOn={globalRiskOn} />}
+      {/* Disruption Alerts (Live Aggregator) */}
+      <DisruptionAlertsPanel zoneId={user.zone.id} />
+
+      {/* Last Payouts (Dynamic Ledger) */}
+      <LastPayoutsPanel uid={user.phone} claims={claims} />
 
       {/* Quick nav */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9 }}>
@@ -227,60 +237,6 @@ export default function WorkerTab({ user, policy, onOpenPolicy, onOpenClaims, gl
           </button>
         ))}
       </div>
-
-      {/* Recent claims (truncated) */}
-      {claims.length > 0 && (
-        <Card>
-          <SectionLabel>Auto-Processed Claims</SectionLabel>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {claims.slice(0, 3).map(c => (
-              <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 11 }}>
-                <div style={{ width: 34, height: 34, borderRadius: 9, background: `${c.color}18`, border: `1px solid ${c.color}35`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.9rem", flexShrink: 0 }}>{c.emoji}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: "#fff", fontWeight: 700, fontSize: "0.82rem" }}>{c.label}</div>
-                  <div style={{ fontSize: "0.67rem", color: DS.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.trigger}</div>
-                </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: "0.87rem", color: DS.green }}>+₹{c.amount.toLocaleString("en-IN")}</div>
-                  <div style={{ fontSize: "0.62rem", color: DS.muted }}>{c.time}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {/* Live Disruption Monitor */}
-      <Card>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 11 }}>
-          <SectionLabel>Live Disruption Monitor</SectionLabel>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <PulseDot color={simActive ? DS.accent : DS.green} />
-            <span style={{ fontSize: "0.67rem", color: simActive ? DS.accent : DS.green }}>
-              {simActive ? "Simulating…" : "Monitoring"}
-            </span>
-          </div>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 14 }}>
-          {readings.map(m => <MetricRow key={m.label} {...m} />)}
-        </div>
-        {claimStage && <div style={{ marginBottom: 12 }}><ClaimProgress stage={claimStage} /></div>}
-        <SectionLabel>🎮 Simulate Disruption</SectionLabel>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 7, marginBottom: 9 }}>
-          {Object.entries(TRIGGER_CONFIGS).map(([type, cfg]) => (
-            <button key={type} onClick={() => simulate(type)} disabled={simActive}
-              style={{ padding: "11px 4px", borderRadius: 11, border: `1px solid ${DS.border}`, background: DS.surface, cursor: simActive ? "not-allowed" : "pointer", opacity: simActive ? 0.35 : 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-              <span style={{ fontSize: "1.15rem" }}>{cfg.emoji}</span>
-              <span style={{ fontSize: "0.62rem", color: DS.muted }}>{cfg.label.split(" ")[0]}</span>
-            </button>
-          ))}
-        </div>
-        {(simActive || claims.length > 0) && (
-          <button onClick={resetSim} style={{ width: "100%", padding: 9, borderRadius: 9, border: `1px solid ${DS.border}`, background: DS.surface, color: DS.muted, cursor: "pointer", fontSize: "0.76rem" }}>
-            ↺ Reset
-          </button>
-        )}
-      </Card>
 
       <div style={{ height: 8 }} />
     </div>

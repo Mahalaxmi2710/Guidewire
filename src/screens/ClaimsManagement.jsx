@@ -11,9 +11,9 @@ import { DB } from "../lib/firebase.js";
 function ClaimProgressBar({ claim }) {
   const steps = [
     { label: "Detected",   done: true },
-    { label: "Validating", done: claim.status !== "pending" },
-    { label: "Fraud Check",done: claim.status === "auto-approved" || claim.status === "partial-hold" },
-    { label: "Credited",   done: claim.status === "auto-approved" },
+    { label: "Validating", done: !["pending", "created"].includes(claim.status) },
+    { label: "Fraud Check",done: ["paid", "auto-approved", "payout-pending"].includes(claim.status) },
+    { label: "Credited",   done: ["paid", "auto-approved"].includes(claim.status) },
   ];
 
   return (
@@ -53,12 +53,15 @@ function ClaimProgressBar({ claim }) {
 // ── Status Badge ──────────────────────────────────────────────
 function ClaimStatusBadge({ status }) {
   const cfg = {
+    "paid":           { color: DS.green,   bg: `${DS.green}18`,   label: "Credited" },
     "auto-approved":  { color: DS.green,   bg: `${DS.green}18`,   label: "Credited" },
-    "partial-hold":   { color: DS.accent2, bg: `${DS.accent2}18`, label: "Partial Hold" },
-    "pending":        { color: DS.blue,    bg: `${DS.blue}18`,    label: "Processing" },
+    "payout-pending": { color: DS.accent2, bg: `${DS.accent2}18`, label: "Processing" },
+    "fraud-blocked":  { color: DS.red,     bg: `${DS.red}18`,     label: "Fraud Blocked" },
+    "pending":        { color: DS.blue,    bg: `${DS.blue}18`,    label: "Validating" },
+    "created":        { color: DS.muted,   bg: `${DS.surface}18`, label: "Created" },
     "rejected":       { color: DS.red,     bg: `${DS.red}18`,     label: "Rejected" },
   };
-  const c = cfg[status] || cfg.pending;
+  const c = cfg[status] || cfg.created;
   return (
     <span style={{ fontSize: "0.68rem", fontWeight: 700, padding: "3px 8px", borderRadius: 6, background: c.bg, color: c.color }}>
       {c.label}
@@ -92,9 +95,103 @@ export default function ClaimsManagement({ user, policy, onBack }) {
     })();
   }, []);
 
-  const totalPaid      = claims.filter(c => c.status === "auto-approved").reduce((a, c) => a + c.amount, 0);
-  const totalPremiums  = policy.premium * 3;  // 3 weeks shown
+  const [displayLimit, setDisplayLimit] = useState(10);
+  
+  const totalPaid      = (claims || [])
+    .filter(c => ["paid", "auto-approved"].includes(c.status))
+    .reduce((a, c) => a + (Number(c.payoutAmount ?? c.amount ?? 0) || 0), 0);
+  
+  const totalPremiums  = (Number(policy?.premium) || 38) * 4;  // Month view
   const roi            = computeWorkerROI(totalPremiums, totalPaid);
+
+  // Filter and sort claims: Newest first
+  const sortedClaims = [...claims].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const visibleClaims = sortedClaims.slice(0, displayLimit);
+
+  const renderHistoryContent = () => {
+    if (loading) {
+      return <div style={{ textAlign: "center", color: DS.muted, padding: 40 }}>Loading claims…</div>;
+    }
+    
+    if (claims.length === 0) {
+      return (
+        <Card style={{ textAlign: "center", padding: 40 }}>
+          <div style={{ fontSize: "2rem", marginBottom: 10 }}>🎉</div>
+          <div style={{ color: "#fff", fontWeight: 700 }}>No disruptions yet</div>
+          <div style={{ color: DS.muted, fontSize: "0.78rem", marginTop: 6 }}>Your coverage is active and monitoring</div>
+        </Card>
+      );
+    }
+
+    return (
+      <>
+        {visibleClaims.map(c => (
+          <Card key={c.id} style={{ cursor: "pointer", border: selected?.id === c.id ? `1.5px solid ${DS.accent}` : `1px solid ${DS.border}` }}
+            onClick={() => setSelected(selected?.id === c.id ? null : c)}>
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: `${c.color || DS.blue}18`, border: `1px solid ${c.color || DS.blue}35`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem", flexShrink: 0 }}>{c.emoji || "💸"}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+                  <div style={{ color: "#fff", fontWeight: 700, fontSize: "0.92rem" }}>
+                    {c.disruptionLabel || c.label || "Parametric Payout"}
+                  </div>
+                  <ClaimStatusBadge status={c.status} />
+                </div>
+                <div style={{ fontSize: "0.72rem", color: DS.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {c.triggerExplanation || c.trigger || "Weather condition threshold reached"}
+                </div>
+              </div>
+            </div>
+
+            {/* Expanded detail */}
+            {selected?.id === c.id && (
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${DS.border}` }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+                  {[
+                    ["Amount", `₹${Math.round(c.payoutAmount ?? c.amount ?? 0).toLocaleString("en-IN")}`],
+                    ["Time",   c.time || (c.createdAt ? new Date(c.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "--:--")],
+                    ["Claim ID", (c.id || "---").slice(0, 12)],
+                    ["UTR / Ref", c.payoutId || c.txnId || "Processing..."],
+                  ].map(([l, v]) => (
+                    <div key={l} style={{ borderRadius: 10, padding: "10px 12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                      <div style={{ fontSize: "0.6rem", color: DS.muted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>{l}</div>
+                      <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "#fff", wordBreak: "break-all" }}>{v}</div>
+                    </div>
+                  ))}
+                </div>
+                
+                <ClaimProgressBar claim={c} />
+                
+                {c.status === "payout-pending" && (
+                  <div style={{ marginTop: 10, padding: 10, borderRadius: 9, background: `${DS.accent2}12`, border: `1px solid ${DS.accent2}30` }}>
+                    <div style={{ fontSize: "0.72rem", color: DS.accent2, fontWeight: 600 }}>
+                      ⚠️ Automated Payout in Progress
+                    </div>
+                    <div style={{ fontSize: "0.68rem", color: DS.muted, marginTop: 3 }}>
+                      Claim verified by ML edge node. Payout is being processed via Gateway.
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+        ))}
+        
+        {claims.length > displayLimit && (
+          <button 
+            onClick={() => setDisplayLimit(d => d + 20)}
+            style={{ 
+              padding: "14px", borderRadius: 12, background: DS.surface, 
+              border: `1px solid ${DS.border}`, color: DS.accent, 
+              fontWeight: 700, cursor: "pointer", marginTop: 4,
+              fontFamily: DS.font, width: "100%"
+            }}>
+            View More ({claims.length - displayLimit} remaining)
+          </button>
+        )}
+      </>
+    );
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: DS.bg, display: "flex", flexDirection: "column" }}>
@@ -102,10 +199,17 @@ export default function ClaimsManagement({ user, policy, onBack }) {
       {/* Header */}
       <div style={{ padding: "28px 20px 14px", flexShrink: 0 }}>
         <div style={{ marginBottom: 18 }}><Logo /></div>
-        <h2 style={{ fontSize: "1.4rem", fontWeight: 900, color: "#fff", fontFamily: DS.display, marginBottom: 4 }}>
-          Claims Management
-        </h2>
-        <p style={{ fontSize: "0.75rem", color: DS.muted }}>Your income protection history</p>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <h2 style={{ fontSize: "1.4rem", fontWeight: 900, color: "#fff", fontFamily: DS.display, marginBottom: 4 }}>
+              Claims Management
+            </h2>
+            <p style={{ fontSize: "0.75rem", color: DS.muted }}>Your income protection history</p>
+          </div>
+          <button onClick={onBack} style={{ padding: "8px 12px", borderRadius: 10, background: DS.surface, border: `1px solid ${DS.border}`, color: DS.muted, cursor: "pointer", fontSize: "0.7rem", fontWeight: 600 }}>
+            ✕ Close
+          </button>
+        </div>
       </div>
 
       {/* Tab bar */}
@@ -123,7 +227,7 @@ export default function ClaimsManagement({ user, policy, onBack }) {
         ))}
       </div>
 
-      <div style={{ flex: 1, padding: "0 20px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ flex: 1, padding: "0 20px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, paddingBottom: 30 }}>
 
         {/* ── HISTORY TAB ── */}
         {tab === "history" && (
@@ -142,61 +246,7 @@ export default function ClaimsManagement({ user, policy, onBack }) {
               ))}
             </div>
 
-            {loading ? (
-              <div style={{ textAlign: "center", color: DS.muted, padding: 40 }}>Loading claims…</div>
-            ) : claims.length === 0 ? (
-              <Card style={{ textAlign: "center", padding: 40 }}>
-                <div style={{ fontSize: "2rem", marginBottom: 10 }}>🎉</div>
-                <div style={{ color: "#fff", fontWeight: 700 }}>No disruptions yet</div>
-                <div style={{ color: DS.muted, fontSize: "0.78rem", marginTop: 6 }}>Your coverage is active and monitoring</div>
-              </Card>
-            ) : (
-              claims.map(c => (
-                <Card key={c.id} style={{ cursor: "pointer", border: selected?.id === c.id ? `1.5px solid ${DS.accent}` : `1px solid ${DS.border}` }}
-                  onClick={() => setSelected(selected?.id === c.id ? null : c)}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-                    <div style={{ width: 38, height: 38, borderRadius: 10, background: `${c.color}18`, border: `1px solid ${c.color}35`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem", flexShrink: 0 }}>{c.emoji}</div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
-                        <div style={{ color: "#fff", fontWeight: 700, fontSize: "0.85rem" }}>{c.label}</div>
-                        <ClaimStatusBadge status={c.status} />
-                      </div>
-                      <div style={{ fontSize: "0.7rem", color: DS.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.trigger}</div>
-                    </div>
-                  </div>
-
-                  {/* Expanded detail */}
-                  {selected?.id === c.id && (
-                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${DS.border}` }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
-                        {[
-                          ["Amount", `₹${c.amount.toLocaleString("en-IN")}`],
-                          ["Time",   c.time],
-                          ["Claim ID", c.id],
-                          ["UTR",    c.payoutId || "Pending"],
-                        ].map(([l, v]) => (
-                          <div key={l} style={{ borderRadius: 8, padding: 9, background: DS.surface }}>
-                            <div style={{ fontSize: "0.62rem", color: DS.muted, marginBottom: 2 }}>{l}</div>
-                            <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#fff", wordBreak: "break-all" }}>{v}</div>
-                          </div>
-                        ))}
-                      </div>
-                      <ClaimProgressBar claim={c} />
-                      {c.status === "partial-hold" && (
-                        <div style={{ marginTop: 10, padding: 10, borderRadius: 9, background: `${DS.accent2}12`, border: `1px solid ${DS.accent2}30` }}>
-                          <div style={{ fontSize: "0.72rem", color: DS.accent2, fontWeight: 600 }}>
-                            ⚠️ Partial hold: ₹{Math.round(c.amount * 0.5)} paid. Verification in progress.
-                          </div>
-                          <div style={{ fontSize: "0.68rem", color: DS.muted, marginTop: 3 }}>
-                            Remaining ₹{Math.round(c.amount * 0.5)} will be released within 24h if validated.
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </Card>
-              ))
-            )}
+            {renderHistoryContent()}
           </>
         )}
 
