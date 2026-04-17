@@ -577,6 +577,23 @@ This video demonstrates the **automated payout and claim lifecycle system**, inc
 🔗 [Access Phase 3 Video](https://drive.google.com/file/d/1s83BUHkl5Rex2WNAytFCFuOYqRZ5n1kT/view?usp=sharing)
 
 ---
+## 📊 Final Pitch Deck
+
+The final pitch deck summarizes the **problem, solution architecture, AI system design, claim automation pipeline, and business model** for the AI-powered parametric insurance platform.
+
+It highlights:
+
+- Problem faced by gig economy workers during disruptions
+- AI-driven parametric insurance architecture
+- Real-time disruption monitoring system
+- Automated claim processing and payout engine
+- Fraud detection and adversarial defense strategy
+- Business sustainability and scalability model
+
+📁 **Google Drive:**  
+🔗 [View Final Pitch Deck](https://drive.google.com/file/d/1st-YNiKRvIe-D4EhPZK1Nc2ib9sjv4Pa/view?usp=sharing)
+
+---
 ## 🏆 Differentiation
 
 - Real-time parametric insurance with zero manual claims
