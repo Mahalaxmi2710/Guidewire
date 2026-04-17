@@ -118,7 +118,7 @@ export default function WorkerTab({ user, policy, onOpenPolicy, onOpenClaims, gl
     });
   }, [user]);
 
-  const totalPaid = claims.reduce((a, c) => a + c.amount, 0);
+  const totalPaid = claims.reduce((a, c) => a + (Number(c.payoutAmount) || Number(c.amount) || 0), 0);
   const currentPremium = globalRiskOn ? Math.round((pricing?.premium || policy.premium) * 1.5) : (pricing?.premium || policy.premium);
   const roi       = computeWorkerROI(currentPremium * 4, totalPaid);
 
@@ -158,7 +158,8 @@ export default function WorkerTab({ user, policy, onOpenPolicy, onOpenClaims, gl
   };
 
   const runClaimPipeline = async (cfg) => {
-    const amount = estimateLoss(user.daily, cfg.hours, cfg.sev);
+    const dailyEarning = Number(user.daily) || Number(policy?.dailyEarning) || 600;
+    const amount = estimateLoss(dailyEarning, cfg.hours, cfg.sev);
     const stages = ["Detecting", "Validating", "Processing", "Credited"];
     for (const stage of stages) {
       setClaimStage(stage);
@@ -167,18 +168,22 @@ export default function WorkerTab({ user, policy, onOpenPolicy, onOpenClaims, gl
     const fraudFlag = false;
     const payout = await Razorpay.processPayout(user.phone, amount * 100);
     const doc = await DB.saveClaim({
-      uid:       user.phone,
-      label:     cfg.label,
-      trigger:   cfg.trigger,
-      amount,
-      emoji:     cfg.emoji,
-      color:     cfg.color,
-      time:      new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
-      payoutId:  payout.utr,
+      uid:           user.phone,
+      label:         cfg.label,
+      trigger:       cfg.trigger,
+      payoutAmount:  amount,
+      amount:        amount, // Keep for backward compatibility until all components migrate
+      emoji:         cfg.emoji,
+      color:         cfg.color,
+      time:          new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+      payoutId:      payout.utr,
+      txnId:         payout.utr,
       fraudFlag,
-      zoneId:    user.zone.id,
+      zoneId:        user.zone.id,
+      status:        "paid",
     });
     setClaims(c => [doc, ...c]);
+
     setSimActive(false);
     setClaimStage(null);
     addToast(`✅ ₹${amount.toLocaleString("en-IN")} credited via Razorpay! UTR: ${payout.utr}`, "success");
