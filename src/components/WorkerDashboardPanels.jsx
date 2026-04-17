@@ -171,8 +171,8 @@ export function LastPayoutsPanel({ uid, claims: propClaims, limit = 5 }) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // If parent doesn't provide claims, fetch them ourselves
-    if (!propClaims) {
+    // If parent doesn't provide claims or it's empty, fetch them ourselves
+    if (!propClaims || propClaims.length === 0) {
       setLoading(true);
       DB.getUserClaims(uid)
         .then(all => setFetchedClaims(all))
@@ -202,8 +202,7 @@ export function LastPayoutsPanel({ uid, claims: propClaims, limit = 5 }) {
     .slice(0, limit);
 
   return (
-    <Card>
-      <SectionLabel>💳 Last Payouts</SectionLabel>
+    <Card style={{ marginTop: 10 }}>
 
       {activeClaims.length === 0 ? (
         <div style={{ textAlign: "center", padding: "14px 0", color: DS.muted, fontSize: "0.72rem" }}>

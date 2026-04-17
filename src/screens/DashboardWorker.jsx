@@ -104,7 +104,18 @@ export default function WorkerTab({ user, policy, onOpenPolicy, onOpenClaims, gl
     
     // Fetch user claims to populate dashboard
     DB.getUserClaims(user.phone)
-      .then(fetchedClaims => setClaims(fetchedClaims))
+      .then(data => {
+        if (!data || data.length === 0) {
+          // Provide demo claims if none exist in DB yet
+          const demo = [
+            { id: "CLM_001", label: "Heavy Rainfall",   trigger: "68mm > 50mm",      amount: 216, emoji: "🌧️", color: DS.blue,    status: "paid", time: "2:14 PM", payoutId: "UTR_A3B2C1", txnId: "UTR_A3B2C1", createdAt: Date.now() - 2 * 86400000, uid: user.phone, payoutMethod: "razorpay" },
+            { id: "CLM_002", label: "Traffic Lockdown", trigger: "Congestion 88 > 80",   amount: 132, emoji: "🚦", color: DS.accent,  status: "paid", time: "6:45 PM", payoutId: "UTR_D4E5F6", txnId: "UTR_D4E5F6", createdAt: Date.now() - 4 * 86400000, uid: user.phone, payoutMethod: "razorpay" }
+          ];
+          setClaims(demo);
+        } else {
+          setClaims(data);
+        }
+      })
       .catch(err => console.error("Error fetching claims for dashboard:", err));
 
     fetchWeather(user.zone.id).then(w => {
@@ -226,10 +237,64 @@ export default function WorkerTab({ user, policy, onOpenPolicy, onOpenClaims, gl
         claimsPaid={totalPaid} 
       />
 
+      {/* Live Readings & Simulation */}
+      <Card>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 15 }}>
+          <SectionLabel>📡 Live Zone Readings</SectionLabel>
+          {simActive && <PulseDot color={DS.accent} />}
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 15 }}>
+          {readings.map(r => (
+            <MetricRow key={r.label} {...r} />
+          ))}
+        </div>
+
+        {claimStage ? (
+          <ClaimProgress stage={claimStage} />
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
+            {[
+              { type: "rain",    icon: "🌩️" },
+              { type: "heat",    icon: "🌡️" },
+              { type: "aqi",     icon: "💨" },
+              { type: "traffic", icon: "🚦" },
+            ].map(sim => (
+              <button
+                key={sim.type}
+                onClick={() => simulate(sim.type)}
+                disabled={simActive}
+                style={{
+                  padding: "10px 0", borderRadius: 10, background: DS.surface,
+                  border: `1px solid ${DS.border}`, color: "#fff", cursor: simActive ? "not-allowed" : "pointer",
+                  fontSize: "1.1rem", transition: "all 0.2s", opacity: simActive ? 0.5 : 1
+                }}
+                onMouseEnter={e => !simActive && (e.currentTarget.style.borderColor = DS.accent)}
+                onMouseLeave={e => !simActive && (e.currentTarget.style.borderColor = DS.border)}
+              >
+                {sim.icon}
+              </button>
+            ))}
+          </div>
+        )}
+        <div style={{ fontSize: "0.6rem", color: DS.muted, textAlign: "center", marginTop: 10 }}>
+          Tap icons to simulate extreme disruption events
+        </div>
+      </Card>
+
       {/* Disruption Alerts (Live Aggregator) */}
       <DisruptionAlertsPanel zoneId={user.zone.id} />
 
       {/* Last Payouts (Dynamic Ledger) */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: -10, padding: "0 4px" }}>
+        <SectionLabel>💳 Last Payouts</SectionLabel>
+        <button 
+          onClick={() => { setClaims([]); addToast("Claim history cleared", "info"); }}
+          style={{ fontSize: "0.6rem", background: "none", border: "none", color: DS.accent, cursor: "pointer", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", padding: "4px 8px" }}
+        >
+          Clear
+        </button>
+      </div>
       <LastPayoutsPanel uid={user.phone} claims={claims} />
 
       {/* Quick nav */}
