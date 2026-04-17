@@ -247,8 +247,9 @@ export function LastPayoutsPanel({ uid, claims: propClaims, limit = 5 }) {
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
                   <div style={{ fontWeight: 800, fontSize: "0.87rem",
                     color: STATUS_COLORS[c.status] ?? DS.green }}>
-                    +₹{(c.payoutAmount ?? c.amount ?? 0).toLocaleString("en-IN")}
+                    +₹{(Number(c.payoutAmount) || Number(c.amount) || 0).toLocaleString("en-IN")}
                   </div>
+
                   <div style={{ fontSize: "0.6rem", color: DS.muted }}>
                     {time ? new Date(time).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—"}
                   </div>
