@@ -277,14 +277,12 @@ export async function createClaim(policy, evaluation, disruptionData, workerData
     zone:            policy.zoneId ?? policy.zone ?? disruptionData?.zoneId ?? "unknown",
     triggers:        evaluation.triggers  ?? [],
     payoutAmount:    evaluation.totalPayout ?? 0,
-    disruptionScore: evaluation.disruptionScore ?? 0,
-    source:          "auto-trigger",
-    weather:         disruptionData?.breakdown?.weather ?? disruptionData?.weather ?? null,
-    traffic:         disruptionData?.breakdown?.traffic ?? disruptionData?.traffic ?? null,
-    demand:          disruptionData?.breakdown?.demand  ?? disruptionData?.demand  ?? null,
+    disruptionLabel:    evaluation.triggers[0]?.label ?? "Parametric Claim",
+    triggerExplanation: evaluation.triggers.map(t => t.label).join(", "),
     createdAt:       Date.now(),
     status:          "pending",
   };
+
 
   // ── Fraud detection ─────────────────────────────────────────
   let recentClaims = [];
@@ -503,16 +501,8 @@ export async function runClaimPipeline(policy, evaluation, disruptionData, worke
   // Step 2
   const { claim: approvedClaim, receipt } = await approveClaim(claim);
 
-  // Step 3
-  let wallet = null;
-  if (receipt?.status === "success") {
-    wallet = await updateWallet(
-      approvedClaim.uid,
-      receipt.amount,
-      approvedClaim.id,
-      receipt.transactionId
-    );
-  }
+  /* Removed redundant wallet update — handled by processPayout() internally */
+
 
   // Step 4
   const notification = await notifyWorker(approvedClaim.uid, approvedClaim, receipt);
