@@ -52,11 +52,13 @@ const MockDB = {
   async getPolicy(policyId) { return _store.policies[policyId] || null; },
   async getUserPolicies(uid) { return Object.values(_store.policies).filter(p => p.userId === uid); },
   async saveClaim(claim) {
-    const id = `CLM_${Date.now()}_${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-    const doc = { ...claim, id, createdAt: Date.now(), status: claim.fraudFlag ? "partial-hold" : "auto-approved" };
+    const id = claim.id || `CLM_${Date.now()}_${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    const status = claim.status || (claim.fraudFlag ? "partial-hold" : "auto-approved");
+    const doc = { ...claim, id, createdAt: Date.now(), status };
     _store.claims.push(doc);
     return doc;
   },
+
   async getUserClaims(uid) { return _store.claims.filter(c => c.uid === uid).sort((a, b) => b.createdAt - a.createdAt); },
   async updateClaimStatus(claimId, status) { const c = _store.claims.find(c => c.id === claimId); if (c) c.status = status; return c; },
 
