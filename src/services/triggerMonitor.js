@@ -166,7 +166,8 @@ export function evaluatePolicy(policy, disruptionData) {
 
   // Apply GlobalRisk coverage ratio cap
   const rawTotal   = activeTriggers.reduce((sum, t) => sum + (t.payout ?? 0), 0);
-  const cappedMax  = GlobalRisk.applyToMaxPayout(policy.weeklyEarnings ?? policy.dailyEarning * 7 ?? 4200);
+  const earnings   = Number(policy.weeklyEarnings) || (policy.dailyEarning ? Number(policy.dailyEarning) * 7 : 4200);
+  const cappedMax  = GlobalRisk.applyToMaxPayout(earnings);
   const totalPayout = Math.min(rawTotal, cappedMax);
 
   // Aggregate disruption score (0–100) for fraud detection reference
@@ -216,12 +217,15 @@ export async function processClaim(policy, disruptionData, evaluation) {
     disruptionScore: evaluation.disruptionScore,
     zone:            zoneId,
     createdAt:       Date.now(),
-    status:          "pending",
-    source:          "auto-trigger",
-    weather:         disruptionData.weather  ?? null,
-    traffic:         disruptionData.traffic  ?? null,
-    demand:          disruptionData.demand   ?? null,
+    disruptionLabel:    evaluation.triggers[0]?.label ?? "Parametric Payout",
+    triggerExplanation: evaluation.triggers.map(t => t.label).join(", "),
+    status:             "pending",
+    source:             "auto-trigger",
+    weather:            disruptionData.weather  ?? null,
+    traffic:            disruptionData.traffic  ?? null,
+    demand:             disruptionData.demand   ?? null,
   };
+
 
   // ── Step 2: Fetch user's recent claims for fraud context ───
   let recentClaims = [];
@@ -289,21 +293,8 @@ export async function processClaim(policy, disruptionData, evaluation) {
     log("error", `Firestore persist failed for ${claimId}`, { err: dbErr.message });
   }
 
-  // ── Step 7: Update Worker Wallet ───────────────────────────
-  if (draftClaim.status === "paid" && payoutReceipt) {
-    try {
-      await updateWorkerWallet({
-        db: DB,
-        workerId,
-        amount:  evaluation.totalPayout,
-        claimId,
-        txnId:   payoutReceipt.txnId,
-      });
-      log("payout", `Wallet updated: ${workerId} +₹${evaluation.totalPayout}`);
-    } catch (walletErr) {
-      log("error", `Wallet update failed for ${workerId}`, { err: walletErr.message });
-    }
-  }
+  /* Removed redundant wallet update — handled by processPayout() internally */
+
 
   return draftClaim;
 }
