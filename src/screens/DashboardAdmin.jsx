@@ -17,9 +17,9 @@ import {
   RegionalDisruptionPanel
 } from "../components/AdminDashboardPanels.jsx";
 import {
-  triggerFakeRainstorm,
-  toggleDemoMode,
-  isDemoMode
+  triggerDemoDisruption,
+  isDemoMode,
+  toggleDemoMode
 } from "../lib/demoMode.js";
 
 const ML_PIPELINE = [
@@ -101,7 +101,8 @@ function SensitivityTable({ zoneId, dailyEarning, premium, globalRiskOn }) {
 
 export default function AdminTab({ claimsCount = 0, selectedZone, selectedEarning, selectedPremium, globalRiskOn, onToggleGlobalRisk }) {
   const [demoActive, setDemoActive] = useState(isDemoMode);
-  const [isTriggering, setIsTriggering] = useState(false);
+  const [processingSim, setProcessingSim] = useState(null);
+  const [activeSim, setActiveSim] = useState(null);
   const [toast, setToast] = useState(null);
 
   const showToast = (msg, type = "success") => {
@@ -109,15 +110,17 @@ export default function AdminTab({ claimsCount = 0, selectedZone, selectedEarnin
     setTimeout(() => setToast(null), 2500);
   };
 
-  const handleTriggerStorm = async () => {
-    setIsTriggering(true);
+  const handleTriggerDemo = async (type) => {
+    setProcessingSim(type);
     try {
-      await triggerFakeRainstorm("velachery");
-      showToast("🌩️ Demo Storm Triggered! Automated pipeline initiated.");
+      await triggerDemoDisruption("velachery", type);
+      setActiveSim(type);
+      const icon = type === "storm" ? "🌩️" : type === "gridlock" ? "🚦" : "💻";
+      showToast(`${icon} Demo ${type} Triggered! Automated pipeline initiated.`);
     } catch (err) {
       showToast("❌ Trigger failed: " + err.message, "warn");
     } finally {
-      setIsTriggering(false);
+      setProcessingSim(null);
     }
   };
 
@@ -243,15 +246,28 @@ export default function AdminTab({ claimsCount = 0, selectedZone, selectedEarnin
             onClick={() => {
               const newState = toggleDemoMode();
               setDemoActive(newState);
+              if (!newState) setActiveSim(null);
             }}
             style={{ flex: 1, padding: "10px", borderRadius: 10, background: demoActive ? DS.accent : DS.surface, border: `1px solid ${DS.border}`, color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: "0.74rem" }}>
             {demoActive ? "✅ Demo Mode On" : "🔘 Demo Mode Off"}
           </button>
           <button
-            onClick={handleTriggerStorm}
-            disabled={!demoActive || isTriggering}
-            style={{ flex: 1, padding: "10px", borderRadius: 10, background: DS.red, opacity: (demoActive && !isTriggering) ? 1 : 0.4, border: "none", color: "#fff", fontWeight: 700, cursor: (demoActive && !isTriggering) ? "pointer" : "not-allowed", fontSize: "0.74rem" }}>
-            {isTriggering ? "⛈️ Processing..." : "🌩️ Trigger Storm"}
+            onClick={() => handleTriggerDemo("storm")}
+            disabled={!demoActive || processingSim}
+            style={{ flex: 1, padding: "10px", borderRadius: 10, background: DS.blue, opacity: (!demoActive || processingSim) ? 0.4 : (activeSim === "storm" ? 1 : 0.6), border: activeSim === "storm" ? "2px solid #fff" : "2px solid transparent", color: "#fff", fontWeight: 700, cursor: (!demoActive || processingSim) ? "not-allowed" : "pointer", fontSize: "0.74rem" }}>
+            {processingSim === "storm" ? "..." : "🌩️ Storm"}
+          </button>
+          <button
+            onClick={() => handleTriggerDemo("gridlock")}
+            disabled={!demoActive || processingSim}
+            style={{ flex: 1, padding: "10px", borderRadius: 10, background: DS.accent2, opacity: (!demoActive || processingSim) ? 0.4 : (activeSim === "gridlock" ? 1 : 0.6), border: activeSim === "gridlock" ? "2px solid #fff" : "2px solid transparent", color: "#fff", fontWeight: 700, cursor: (!demoActive || processingSim) ? "not-allowed" : "pointer", fontSize: "0.74rem" }}>
+            {processingSim === "gridlock" ? "..." : "🚦 Gridlock"}
+          </button>
+          <button
+            onClick={() => handleTriggerDemo("outage")}
+            disabled={!demoActive || processingSim}
+            style={{ flex: 1, padding: "10px", borderRadius: 10, background: DS.red, opacity: (!demoActive || processingSim) ? 0.4 : (activeSim === "outage" ? 1 : 0.6), border: activeSim === "outage" ? "2px solid #fff" : "2px solid transparent", color: "#fff", fontWeight: 700, cursor: (!demoActive || processingSim) ? "not-allowed" : "pointer", fontSize: "0.74rem" }}>
+            {processingSim === "outage" ? "..." : "💻 Outage"}
           </button>
         </div>
       </Card>

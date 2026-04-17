@@ -124,11 +124,14 @@ export function evaluatePolicy(policy, disruptionData) {
   const constraints = GlobalRisk.getConstraints();
 
   const activeTriggers = [];
+  
+  // Safe extraction of daily earnings, defaulting to 600 INR
+  const safeDailyEarning = policy.dailyEarning || (policy.weeklyEarnings ? policy.weeklyEarnings / 7 : 600);
+  const safeHourlyRate = safeDailyEarning / 10;
 
   // ── 1. Weather triggers ────────────────────────────────────
   if (weather) {
-    const dailyEarning = policy.dailyEarning ?? policy.weeklyEarnings / 7 ?? 600;
-    const weatherTriggers = evaluateTriggers(weather, dailyEarning);
+    const weatherTriggers = evaluateTriggers(weather, safeDailyEarning);
     activeTriggers.push(
       ...weatherTriggers.map(t => ({ ...t, source: "weather" }))
     );
@@ -136,11 +139,10 @@ export function evaluatePolicy(policy, disruptionData) {
 
   // ── 2. Traffic trigger ─────────────────────────────────────
   if (traffic && isTrafficTriggered(traffic)) {
-    const hourly = (policy.dailyEarning ?? 600) / 10;
     activeTriggers.push({
       type:    "traffic_lockdown",
-      label:   `Traffic: ${traffic.severity}`,
-      payout:  Math.round(hourly * 2 * 0.6),
+      label:   traffic.events?.[0]?.label ?? `Traffic: ${traffic.severity}`,
+      payout:  Math.round(safeHourlyRate * 2 * 0.6),
       source:  "traffic",
       details: traffic,
     });
@@ -148,12 +150,11 @@ export function evaluatePolicy(policy, disruptionData) {
 
   // ── 3. Demand trigger ──────────────────────────────────────
   if (demand && isDemandTriggered(demand)) {
-    const hourly = (policy.dailyEarning ?? 600) / 10;
     const factor = demand.disruptionType?.payoutFactor ?? 0.70;
     activeTriggers.push({
       type:    "demand_disruption",
       label:   demand.disruptionType?.label ?? "Demand Disruption",
-      payout:  Math.round(hourly * 4 * factor),
+      payout:  Math.round(safeHourlyRate * 4 * factor),
       source:  "demand",
       details: demand,
     });

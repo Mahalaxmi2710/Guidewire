@@ -102,6 +102,11 @@ export default function WorkerTab({ user, policy, onOpenPolicy, onOpenClaims, gl
   useEffect(() => {
     seedUserEarnings(user.phone, user.daily);
     
+    // Fetch user claims to populate dashboard
+    DB.getUserClaims(user.phone)
+      .then(fetchedClaims => setClaims(fetchedClaims))
+      .catch(err => console.error("Error fetching claims for dashboard:", err));
+
     fetchWeather(user.zone.id).then(w => {
       setMetrics(m => ({ ...m, rainfall: w.rainfall, temperature: w.temperature, aqi: w.aqi, traffic: w.traffic }));
       setWeatherSrc(w.source);

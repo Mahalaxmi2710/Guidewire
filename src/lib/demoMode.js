@@ -40,60 +40,53 @@ export function toggleDemoMode(val) {
  * triggerFakeRainstorm
  * Simulates an extreme weather event in a specific region,
  * forces the weather API to return stormy data, and 
+ * triggerDemoDisruption
+ * Simulates an extreme event in a specific region,
+ * forces the weather API to return stormy data (if applicable), and 
  * manually triggers the automated claim pipeline for all
  * active workers in that zone.
  * 
  * Flow:
- *   1. Set extreme weather override
+ *   1. Set extreme condition data
  *   2. Fetch active policies for the region
- *   3. Evaluate policies against the "storm"
+ *   3. Evaluate policies against the disruption
  *   4. Run Full Pipeline (Claim -> Fraud -> Payout -> Wallet -> Notify)
  * 
  * @param {string} zoneId - Region to hit (e.g. "velachery")
+ * @param {string} type - Event type ("storm", "gridlock", "outage")
  * @returns {Promise<object>} Summary of demo execution
  */
-export async function triggerFakeRainstorm(zoneId = "velachery") {
+export async function triggerDemoDisruption(zoneId = "velachery", type = "storm") {
   // Ensure demo mode is on
   if (!isDemoMode) toggleDemoMode(true);
 
-  console.log(`[DemoMode] 🌩️ Initiating Fake Rainstorm in ${zoneId.toUpperCase()}...`);
+  console.log(`[DemoMode] 💥 Initiating Fake ${type.toUpperCase()} in ${zoneId.toUpperCase()}...`);
 
   // ── 1. Define extreme condition data ────────────────────────
-  const stormWeatherData = {
-    rainfall:    92,               // Extreme (threshold is 50mm)
-    temperature: 24,
-    aqi:         145,
-    traffic:     95,               // Near gridlock
-    source:      "demo-storm-generator"
-  };
-
-  // Unified snapshot used for evaluation and pipeline
-  // Includes extreme traffic and demand drops to ensure multiple triggers
-  const demoDisruption = {
+  let snapshot = {
     zoneId,
     fetchedAt: Date.now(),
-    weather:   stormWeatherData,
-    traffic:   { 
-      severity: 0.95, 
-      events: [{ label: "Demo Flash Flood", impact: "critical" }],
-      congestionLevel: 95 
-    },
-    demand:    { 
-      demandDrop: 0.75, 
-      platformStatus: "down",
-      disruptionType: { label: "Cyclone Shutdown", payoutFactor: 0.85 }
-    },
-    // Mirroring breakdown structure from disruptionAggregator
-    breakdown: {
-      weather: stormWeatherData,
-      traffic: { severity: 0.95, congestionLevel: 95 },
-      demand:  { platformStatus: "down" }
-    }
+    weather: { rainfall: 0, temperature: 35, aqi: 120, traffic: 60, source: "demo" },
+    traffic: { severity: 0.2, events: [], congestionLevel: 45 },
+    demand:  { demandDrop: 0, platformStatus: "normal", disruptionType: { label: "Normal Operations", payoutFactor: 0 } },
+    breakdown: {}
   };
 
-  // ── 2. Force Weather API Override ───────────────────────────
-  // This ensures even the UI (RiskProfile, Dashboard) shows the storm
-  setDemoWeather(zoneId, stormWeatherData);
+  if (type === "storm") {
+    snapshot.weather = { rainfall: 92, temperature: 24, aqi: 145, traffic: 95, source: "demo" };
+    snapshot.traffic = { severity: 0.95, events: [{ label: "Demo Flash Flood", impact: "critical" }], congestionLevel: 95 };
+    snapshot.demand  = { demandDrop: 0.75, platformStatus: "down", disruptionType: { label: "Cyclone Shutdown", payoutFactor: 0.85 } };
+  } else if (type === "gridlock") {
+    snapshot.traffic = { severity: 0.98, events: [{ label: "Citywide Gridlock", impact: "critical" }, { label: "Accident Blockage", impact: "high" }], congestionLevel: 98 };
+  } else if (type === "outage") {
+    snapshot.demand  = { demandDrop: 1.0, platformStatus: "down", disruptionType: { label: "Platform Sever Outage", payoutFactor: 0.90 } };
+  }
+
+  // Mirroring breakdown structure from disruptionAggregator
+  snapshot.breakdown = { weather: snapshot.weather, traffic: snapshot.traffic, demand: snapshot.demand };
+
+  // ── 2. Force Weather API Override (if storm) ────────────────
+  if (type === "storm") setDemoWeather(zoneId, snapshot.weather);
 
   // ── 3. Find target policies ─────────────────────────────────
   let allPolicies = [];
@@ -104,34 +97,19 @@ export async function triggerFakeRainstorm(zoneId = "velachery") {
     return { success: false, error: err.message };
   }
 
-  const targetPolicies = allPolicies.filter(p => 
-    (p.zoneId === zoneId || p.zone === zoneId)
-  );
+  const targetPolicies = allPolicies.filter(p => (p.zoneId === zoneId || p.zone === zoneId));
 
   console.log(`[DemoMode] Targeting ${targetPolicies.length} active policies in ${zoneId}`);
 
   // ── 4. Process Claims (one by one for demo logging) ─────────
   const results = [];
-  
   for (const policy of targetPolicies) {
     try {
-      // Step A: Evaluate
-      const evaluation = evaluatePolicy(policy, demoDisruption);
-      
-      if (!evaluation.triggered) {
-        console.log(`[DemoMode] Worker ${policy.userId || policy.uid} not triggered (unexpected)`);
-        continue;
-      }
+      const evaluation = evaluatePolicy(policy, snapshot);
+      if (!evaluation.triggered) continue;
 
       console.log(`[DemoMode] ⚡ TRIGGER: Policy ${policy.policyId} | ₹${evaluation.totalPayout} payout estimated`);
-
-      // Step B: Run the exact same pipeline used by triggerMonitor
-      const outcome = await runClaimPipeline(
-        policy, 
-        evaluation, 
-        demoDisruption,
-        { earnings: policy.dailyEarning * 30 } // mock worker profile
-      );
+      const outcome = await runClaimPipeline(policy, evaluation, snapshot, { earnings: policy.dailyEarning * 30 });
 
       results.push({
         workerId: policy.userId || policy.uid,
@@ -140,7 +118,6 @@ export async function triggerFakeRainstorm(zoneId = "velachery") {
         amount:   outcome.receipt?.amount ?? 0,
         txnId:    outcome.receipt?.transactionId ?? "N/A"
       });
-
     } catch (policyErr) {
       console.error(`[DemoMode] Error processing policy ${policy.policyId}:`, policyErr.message);
     }
@@ -150,13 +127,18 @@ export async function triggerFakeRainstorm(zoneId = "velachery") {
 
   return {
     success: true,
-    zone:    zoneId,
-    storm:   stormWeatherData,
-    stats: {
-      targeted:  targetPolicies.length,
-      triggered: results.length,
-      payouts:   results.filter(r => r.status === "paid").length
+    zone: zoneId,
+    type: type,
+    stats: { 
+      targeted: targetPolicies.length, 
+      triggered: results.length, 
+      payouts: results.filter(r => r.status === "paid" || r.status === "auto-approved").length 
     },
     results
   };
+}
+
+// Keep original function export explicitly to not break existing imports
+export async function triggerFakeRainstorm(zoneId = "velachery") {
+  return triggerDemoDisruption(zoneId, "storm");
 }
