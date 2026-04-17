@@ -1,7 +1,3 @@
-// ─────────────────────────────────────────────────────────────
-//  RideSure Phase 2 — Screen: Risk Profile + Premium
-//  Now uses real ML model (mlModel.js) and shows explainability
-// ─────────────────────────────────────────────────────────────
 import { useState } from "react";
 import { DS, RISK_META } from "../constants.js";
 import { Logo, Bar, Card, GlowBtn, SectionLabel } from "../components/ui.jsx";
@@ -40,15 +36,19 @@ export default function RiskProfile({ user, onActivate, onBack }) {
     const polId  = `POL_${Date.now()}`;
 
     await DB.savePolicy(polId, {
-      userId:    user.phone,
-      zone:      zone.id,
+      userId:       user.phone,
+      uid:          user.phone,
+      zoneId:       zone.id,
+      zone:         zone.id,
+      dailyEarning: user.daily,
       premium,
       maxPayout,
-      orderId:   order.id,
-      paymentId: pay.id,
-      mlVersion: mlResult.modelVersion,
-      startDate: new Date().toISOString(),
+      orderId:      order.id,
+      paymentId:    pay.id,
+      mlVersion:    mlResult.modelVersion,
+      startDate:    new Date().toISOString(),
     });
+
 
     setPayState("done");
     setTimeout(() => onActivate({ premium, maxPayout, policyId: polId }), 1100);
