@@ -403,11 +403,13 @@ export async function processPayout(claim) {
     transactionId: receipt.transactionId ?? receipt.txnId ?? rid("TXN"),
     status:        receipt.status        ?? PAYOUT_STATUS.SUCCESS,
     amount,
+    payoutAmount:  amount,
     method:        receipt.method        ?? adapter.name,
     timestamp:     receipt.timestamp     ?? Date.now(),
     workerId,
     claimId:       claim.id,
   };
+
 
   // Log to in-memory ledger
   logTransaction({
