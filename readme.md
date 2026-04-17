@@ -571,10 +571,10 @@ This video demonstrates the **automated payout and claim lifecycle system**, inc
 6. Payment execution through Razorpay (test mode)  
 
 ▶️ **YouTube:**  
-🔗 [Watch Phase 3 Demo](YOUR_YOUTUBE_LINK)
+🔗 [Watch Phase 3 Demo](https://youtu.be/f48sY1BqtXQ?si=uIGp2EWfs8w5TCKW)
 
 📁 **Google Drive:**  
-🔗 [Access Phase 3 Video](YOUR_DRIVE_LINK)
+🔗 [Access Phase 3 Video](https://drive.google.com/file/d/1s83BUHkl5Rex2WNAytFCFuOYqRZ5n1kT/view?usp=sharing)
 
 ---
 ## 🏆 Differentiation
