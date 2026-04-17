@@ -558,6 +558,25 @@ This video demonstrates the **enhanced AI-powered system**, including:
 🔗 [Access Phase 2 Video](https://drive.google.com/file/d/1W-gcChPP8-ZpHZMSChuGm7erVcLfKN0E/view?usp=sharing)
 
 ---
+
+### ⚡ Phase 3 Demo
+
+This video demonstrates the **automated payout and claim lifecycle system**, including:
+
+1. Real-time disruption detection triggering a claim  
+2. Automatic claim creation in the system  
+3. Fraud detection verification step  
+4. Loss estimation based on hourly income and disruption duration  
+5. Automated payout calculation  
+6. Payment execution through Razorpay (test mode)  
+
+▶️ **YouTube:**  
+🔗 [Watch Phase 3 Demo](YOUR_YOUTUBE_LINK)
+
+📁 **Google Drive:**  
+🔗 [Access Phase 3 Video](YOUR_DRIVE_LINK)
+
+---
 ## 🏆 Differentiation
 
 - Real-time parametric insurance with zero manual claims
